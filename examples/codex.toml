@@ -1,0 +1,7 @@
+# Example only. This file is NOT automatically loaded and changes no global configuration.
+# Adjust absolute paths if you move the project.
+[mcp_servers.font_design]
+command = 'C:/Users/Administrator/IdeaProjects/font-design-mcp/.venv/Scripts/python.exe'
+args = ['-m', 'font_design_mcp', 'serve', '--workspace', 'C:/Users/Administrator/IdeaProjects/font-design-mcp/workspace']
+startup_timeout_sec = 20
+tool_timeout_sec = 180

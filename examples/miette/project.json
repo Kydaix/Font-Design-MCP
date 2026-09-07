@@ -1,0 +1,817 @@
+{
+  "project_id": "5c79bbb805cd4fe288f77a50b8a1b1fd",
+  "revision": "c0e837a8e5394b86b4286e7f243861c5",
+  "validation": {
+    "review": "automatic",
+    "valid": true,
+    "errors": [],
+    "observations": [
+      {
+        "glyph": ".notdef",
+        "contour": "outer",
+        "signed_area": 336000,
+        "direction": "ccw"
+      },
+      {
+        "glyph": ".notdef",
+        "contour": "inner",
+        "signed_area": -172800,
+        "direction": "cw"
+      },
+      {
+        "glyph": "A",
+        "contour": "A_c0",
+        "signed_area": 163459.31209720005,
+        "direction": "ccw"
+      },
+      {
+        "glyph": "A",
+        "contour": "A_c1",
+        "signed_area": -23116.924869999995,
+        "direction": "cw"
+      },
+      {
+        "glyph": "AE",
+        "contour": "AE_c0",
+        "signed_area": 281389.39722895,
+        "direction": "ccw"
+      },
+      {
+        "glyph": "AE",
+        "contour": "AE_c1",
+        "signed_area": -37113.8305,
+        "direction": "cw"
+      },
+      {
+        "glyph": "B",
+        "contour": "B_c0",
+        "signed_area": 324024.3395168001,
+        "direction": "ccw"
+      },
+      {
+        "glyph": "B",
+        "contour": "B_c1",
+        "signed_area": -57155.52849524999,
+        "direction": "cw"
+      },
+      {
+        "glyph": "B",
+        "contour": "B_c2",
+        "signed_area": -72236.2627236,
+        "direction": "cw"
+      },
+      {
+        "glyph": "C",
+        "contour": "C_c0",
+        "signed_area": 130453.26642719987,
+        "direction": "ccw"
+      },
+      {
+        "glyph": "D",
+        "contour": "D_c0",
+        "signed_area": 359324.81668955006,
+        "direction": "ccw"
+      },
+      {
+        "glyph": "D",
+        "contour": "D_c1",
+        "signed_area": -186893.11331819993,
+        "direction": "cw"
+      },
+      {
+        "glyph": "E",
+        "contour": "E_c0",
+        "signed_area": 152439.1133492,
+        "direction": "ccw"
+      },
+      {
+        "glyph": "F",
+        "contour": "F_c0",
+        "signed_area": 118358.22418055,
+        "direction": "ccw"
+      },
+      {
+        "glyph": "G",
+        "contour": "G_c0",
+        "signed_area": 171698.77291390012,
+        "direction": "ccw"
+      },
+      {
+        "glyph": "H",
+        "contour": "H_c0",
+        "signed_area": 154023.1133492,
+        "direction": "ccw"
+      },
+      {
+        "glyph": "I",
+        "contour": "I_c0",
+        "signed_area": 96119.1133492,
+        "direction": "ccw"
+      },
+      {
+        "glyph": "J",
+        "contour": "J_c0",
+        "signed_area": 99128.5608986,
+        "direction": "ccw"
+      },
+      {
+        "glyph": "K",
+        "contour": "K_c0",
+        "signed_area": 150776.91529150004,
+        "direction": "ccw"
+      },
+      {
+        "glyph": "L",
+        "contour": "L_c0",
+        "signed_area": 90764.44584325,
+        "direction": "ccw"
+      },
+      {
+        "glyph": "M",
+        "contour": "M_c0",
+        "signed_area": 198944.22471200005,
+        "direction": "ccw"
+      },
+      {
+        "glyph": "N",
+        "contour": "N_c0",
+        "signed_area": 178855.6634591,
+        "direction": "ccw"
+      },
+      {
+        "glyph": "O",
+        "contour": "O_c0",
+        "signed_area": 341679.83817,
+        "direction": "ccw"
+      },
+      {
+        "glyph": "O",
+        "contour": "O_c1",
+        "signed_area": -182955.45348469997,
+        "direction": "cw"
+      },
+      {
+        "glyph": "OE",
+        "contour": "OE_c0",
+        "signed_area": 455680.6462974,
+        "direction": "ccw"
+      },
+      {
+        "glyph": "OE",
+        "contour": "OE_c1",
+        "signed_area": -189879.0041409,
+        "direction": "cw"
+      },
+      {
+        "glyph": "P",
+        "contour": "P_c0",
+        "signed_area": 217297.20802845,
+        "direction": "ccw"
+      },
+      {
+        "glyph": "P",
+        "contour": "P_c1",
+        "signed_area": -75455.63345320002,
+        "direction": "cw"
+      },
+      {
+        "glyph": "Q",
+        "contour": "Q_c0",
+        "signed_area": 358114.22708899993,
+        "direction": "ccw"
+      },
+      {
+        "glyph": "Q",
+        "contour": "Q_c1",
+        "signed_area": -175088.06320424998,
+        "direction": "cw"
+      },
+      {
+        "glyph": "R",
+        "contour": "R_c0",
+        "signed_area": 243583.34775570003,
+        "direction": "ccw"
+      },
+      {
+        "glyph": "R",
+        "contour": "R_c1",
+        "signed_area": -71279.49707844999,
+        "direction": "cw"
+      },
+      {
+        "glyph": "S",
+        "contour": "S_c0",
+        "signed_area": 150503.7054543998,
+        "direction": "ccw"
+      },
+      {
+        "glyph": "T",
+        "contour": "T_c0",
+        "signed_area": 102053.33501190005,
+        "direction": "ccw"
+      },
+      {
+        "glyph": "U",
+        "contour": "U_c0",
+        "signed_area": 143011.26936350003,
+        "direction": "ccw"
+      },
+      {
+        "glyph": "V",
+        "contour": "V_c0",
+        "signed_area": 120882.5844422,
+        "direction": "ccw"
+      },
+      {
+        "glyph": "W",
+        "contour": "W_c0",
+        "signed_area": 199091.82545100004,
+        "direction": "ccw"
+      },
+      {
+        "glyph": "X",
+        "contour": "X_c0",
+        "signed_area": 140886.22613200004,
+        "direction": "ccw"
+      },
+      {
+        "glyph": "Y",
+        "contour": "Y_c0",
+        "signed_area": 101546.26377929997,
+        "direction": "ccw"
+      },
+      {
+        "glyph": "Z",
+        "contour": "Z_c0",
+        "signed_area": 148630.55970309998,
+        "direction": "ccw"
+      },
+      {
+        "glyph": "a",
+        "contour": "a_c0",
+        "signed_area": 175610.17623280003,
+        "direction": "ccw"
+      },
+      {
+        "glyph": "a",
+        "contour": "a_c1",
+        "signed_area": -40520.7645583,
+        "direction": "cw"
+      },
+      {
+        "glyph": "acute",
+        "contour": "acute_c0",
+        "signed_area": 13182.3883406,
+        "direction": "ccw"
+      },
+      {
+        "glyph": "ae",
+        "contour": "ae_c0",
+        "signed_area": 304410.08188119996,
+        "direction": "ccw"
+      },
+      {
+        "glyph": "ae",
+        "contour": "ae_c1",
+        "signed_area": -25418.17684005002,
+        "direction": "cw"
+      },
+      {
+        "glyph": "ae",
+        "contour": "ae_c2",
+        "signed_area": -40520.7645583,
+        "direction": "cw"
+      },
+      {
+        "glyph": "b",
+        "contour": "b_c0",
+        "signed_area": 235497.82103954995,
+        "direction": "ccw"
+      },
+      {
+        "glyph": "b",
+        "contour": "b_c1",
+        "signed_area": -82949.84157425001,
+        "direction": "cw"
+      },
+      {
+        "glyph": "c",
+        "contour": "c_c0",
+        "signed_area": 91805.11741279995,
+        "direction": "ccw"
+      },
+      {
+        "glyph": "cedilla",
+        "contour": "cedilla_c0",
+        "signed_area": 20107.42778105,
+        "direction": "ccw"
+      },
+      {
+        "glyph": "circumflex",
+        "contour": "circumflex_c0",
+        "signed_area": 20381.6646968,
+        "direction": "ccw"
+      },
+      {
+        "glyph": "colon",
+        "contour": "colon_c0",
+        "signed_area": 6259.556674600002,
+        "direction": "ccw"
+      },
+      {
+        "glyph": "colon",
+        "contour": "colon_c1",
+        "signed_area": 6259.5566746,
+        "direction": "ccw"
+      },
+      {
+        "glyph": "comma",
+        "contour": "comma_c0",
+        "signed_area": 14154.244214499999,
+        "direction": "ccw"
+      },
+      {
+        "glyph": "d",
+        "contour": "d_c0",
+        "signed_area": 235501.14800664998,
+        "direction": "ccw"
+      },
+      {
+        "glyph": "d",
+        "contour": "d_c1",
+        "signed_area": -82949.84157425001,
+        "direction": "cw"
+      },
+      {
+        "glyph": "dieresis",
+        "contour": "dieresis_c0",
+        "signed_area": 3989.4090496,
+        "direction": "ccw"
+      },
+      {
+        "glyph": "dieresis",
+        "contour": "dieresis_c1",
+        "signed_area": 3989.4090496,
+        "direction": "ccw"
+      },
+      {
+        "glyph": "e",
+        "contour": "e_c0",
+        "signed_area": 154982.40721805004,
+        "direction": "ccw"
+      },
+      {
+        "glyph": "e",
+        "contour": "e_c1",
+        "signed_area": -25418.176840049997,
+        "direction": "cw"
+      },
+      {
+        "glyph": "ellipsis",
+        "contour": "ellipsis_c0",
+        "signed_area": 6259.5566745999995,
+        "direction": "ccw"
+      },
+      {
+        "glyph": "ellipsis",
+        "contour": "ellipsis_c1",
+        "signed_area": 6259.5566746,
+        "direction": "ccw"
+      },
+      {
+        "glyph": "ellipsis",
+        "contour": "ellipsis_c2",
+        "signed_area": 6259.5566746,
+        "direction": "ccw"
+      },
+      {
+        "glyph": "emdash",
+        "contour": "emdash_c0",
+        "signed_area": 61081.54384639999,
+        "direction": "ccw"
+      },
+      {
+        "glyph": "endash",
+        "contour": "endash_c0",
+        "signed_area": 38281.54384639999,
+        "direction": "ccw"
+      },
+      {
+        "glyph": "exclam",
+        "contour": "exclam_c0",
+        "signed_area": 44187.5566746,
+        "direction": "ccw"
+      },
+      {
+        "glyph": "exclam",
+        "contour": "exclam_c1",
+        "signed_area": 6259.5566745999995,
+        "direction": "ccw"
+      },
+      {
+        "glyph": "f",
+        "contour": "f_c0",
+        "signed_area": 93329.32222234999,
+        "direction": "ccw"
+      },
+      {
+        "glyph": "g",
+        "contour": "g_c0",
+        "signed_area": 262182.44918379997,
+        "direction": "ccw"
+      },
+      {
+        "glyph": "g",
+        "contour": "g_c1",
+        "signed_area": -82949.84157425001,
+        "direction": "cw"
+      },
+      {
+        "glyph": "grave",
+        "contour": "grave_c0",
+        "signed_area": 13182.388340600002,
+        "direction": "ccw"
+      },
+      {
+        "glyph": "guillemotleft",
+        "contour": "guillemotleft_c0",
+        "signed_area": 29642.104782800005,
+        "direction": "ccw"
+      },
+      {
+        "glyph": "guillemotleft",
+        "contour": "guillemotleft_c1",
+        "signed_area": 29642.104782800016,
+        "direction": "ccw"
+      },
+      {
+        "glyph": "guillemotright",
+        "contour": "guillemotright_c0",
+        "signed_area": 29642.104782799997,
+        "direction": "ccw"
+      },
+      {
+        "glyph": "guillemotright",
+        "contour": "guillemotright_c1",
+        "signed_area": 29642.1047828,
+        "direction": "ccw"
+      },
+      {
+        "glyph": "h",
+        "contour": "h_c0",
+        "signed_area": 128491.49969580003,
+        "direction": "ccw"
+      },
+      {
+        "glyph": "hyphen",
+        "contour": "hyphen_c0",
+        "signed_area": 20421.543846399996,
+        "direction": "ccw"
+      },
+      {
+        "glyph": "i",
+        "contour": "i_c0",
+        "signed_area": 6259.556674599997,
+        "direction": "ccw"
+      },
+      {
+        "glyph": "i",
+        "contour": "i_c1",
+        "signed_area": 44099.5566746,
+        "direction": "ccw"
+      },
+      {
+        "glyph": "i.base",
+        "contour": "i_base_c0",
+        "signed_area": 44099.5566746,
+        "direction": "ccw"
+      },
+      {
+        "glyph": "j",
+        "contour": "j_c0",
+        "signed_area": 6259.556674599997,
+        "direction": "ccw"
+      },
+      {
+        "glyph": "j",
+        "contour": "j_c1",
+        "signed_area": 70118.58650175,
+        "direction": "ccw"
+      },
+      {
+        "glyph": "k",
+        "contour": "k_c0",
+        "signed_area": 129588.0668694,
+        "direction": "ccw"
+      },
+      {
+        "glyph": "l",
+        "contour": "l_c0",
+        "signed_area": 70446.26889759999,
+        "direction": "ccw"
+      },
+      {
+        "glyph": "m",
+        "contour": "m_c0",
+        "signed_area": 170174.69418565,
+        "direction": "ccw"
+      },
+      {
+        "glyph": "n",
+        "contour": "n_c0",
+        "signed_area": 108272.63124385002,
+        "direction": "ccw"
+      },
+      {
+        "glyph": "o",
+        "contour": "o_c0",
+        "signed_area": 197250.41532644996,
+        "direction": "ccw"
+      },
+      {
+        "glyph": "o",
+        "contour": "o_c1",
+        "signed_area": -82949.84157425001,
+        "direction": "cw"
+      },
+      {
+        "glyph": "oe",
+        "contour": "oe_c0",
+        "signed_area": 324033.23065900005,
+        "direction": "ccw"
+      },
+      {
+        "glyph": "oe",
+        "contour": "oe_c1",
+        "signed_area": -75946.11199590002,
+        "direction": "cw"
+      },
+      {
+        "glyph": "oe",
+        "contour": "oe_c2",
+        "signed_area": -26093.553886150014,
+        "direction": "cw"
+      },
+      {
+        "glyph": "p",
+        "contour": "p_c0",
+        "signed_area": 234617.82103954998,
+        "direction": "ccw"
+      },
+      {
+        "glyph": "p",
+        "contour": "p_c1",
+        "signed_area": -82949.84157425001,
+        "direction": "cw"
+      },
+      {
+        "glyph": "parenleft",
+        "contour": "parenleft_c0",
+        "signed_area": 73466.56355830005,
+        "direction": "ccw"
+      },
+      {
+        "glyph": "parenright",
+        "contour": "parenright_c0",
+        "signed_area": 73466.56355830001,
+        "direction": "ccw"
+      },
+      {
+        "glyph": "period",
+        "contour": "period_c0",
+        "signed_area": 6259.5566745999995,
+        "direction": "ccw"
+      },
+      {
+        "glyph": "q",
+        "contour": "q_c0",
+        "signed_area": 234621.14800664998,
+        "direction": "ccw"
+      },
+      {
+        "glyph": "q",
+        "contour": "q_c1",
+        "signed_area": -82949.84157425001,
+        "direction": "cw"
+      },
+      {
+        "glyph": "question",
+        "contour": "question_c0",
+        "signed_area": 63832.1656008001,
+        "direction": "ccw"
+      },
+      {
+        "glyph": "question",
+        "contour": "question_c1",
+        "signed_area": 4689.5438464,
+        "direction": "ccw"
+      },
+      {
+        "glyph": "quotedbl",
+        "contour": "quotedbl_c0",
+        "signed_area": 14073.863773999998,
+        "direction": "ccw"
+      },
+      {
+        "glyph": "quotedbl",
+        "contour": "quotedbl_c1",
+        "signed_area": 14073.863774,
+        "direction": "ccw"
+      },
+      {
+        "glyph": "quotedblleft",
+        "contour": "quotedblleft_c0",
+        "signed_area": 17984.4725858,
+        "direction": "ccw"
+      },
+      {
+        "glyph": "quotedblleft",
+        "contour": "quotedblleft_c1",
+        "signed_area": 17984.472585800002,
+        "direction": "ccw"
+      },
+      {
+        "glyph": "quotedblright",
+        "contour": "quotedblright_c0",
+        "signed_area": 17984.472585799984,
+        "direction": "ccw"
+      },
+      {
+        "glyph": "quotedblright",
+        "contour": "quotedblright_c1",
+        "signed_area": 17984.47258579998,
+        "direction": "ccw"
+      },
+      {
+        "glyph": "quoteleft",
+        "contour": "quoteleft_c0",
+        "signed_area": 17984.4725858,
+        "direction": "ccw"
+      },
+      {
+        "glyph": "quoteright",
+        "contour": "quoteright_c0",
+        "signed_area": 17984.472585799984,
+        "direction": "ccw"
+      },
+      {
+        "glyph": "quotesingle",
+        "contour": "quotesingle_c0",
+        "signed_area": 14073.863774,
+        "direction": "ccw"
+      },
+      {
+        "glyph": "r",
+        "contour": "r_c0",
+        "signed_area": 64593.53912429999,
+        "direction": "ccw"
+      },
+      {
+        "glyph": "s",
+        "contour": "s_c0",
+        "signed_area": 107240.61337620001,
+        "direction": "ccw"
+      },
+      {
+        "glyph": "s",
+        "contour": "s_c1",
+        "signed_area": -0.000009999999999288356,
+        "direction": "cw"
+      },
+      {
+        "glyph": "semicolon",
+        "contour": "semicolon_c0",
+        "signed_area": 6259.556674600002,
+        "direction": "ccw"
+      },
+      {
+        "glyph": "semicolon",
+        "contour": "semicolon_c1",
+        "signed_area": 17218.174086199997,
+        "direction": "ccw"
+      },
+      {
+        "glyph": "t",
+        "contour": "t_c0",
+        "signed_area": 85159.00797045,
+        "direction": "ccw"
+      },
+      {
+        "glyph": "u",
+        "contour": "u_c0",
+        "signed_area": 109219.78570105002,
+        "direction": "ccw"
+      },
+      {
+        "glyph": "v",
+        "contour": "v_c0",
+        "signed_area": 86347.77267540002,
+        "direction": "ccw"
+      },
+      {
+        "glyph": "w",
+        "contour": "w_c0",
+        "signed_area": 144612.08257629996,
+        "direction": "ccw"
+      },
+      {
+        "glyph": "x",
+        "contour": "x_c0",
+        "signed_area": 102797.83895079995,
+        "direction": "ccw"
+      },
+      {
+        "glyph": "y",
+        "contour": "y_c0",
+        "signed_area": 115522.6522452,
+        "direction": "ccw"
+      },
+      {
+        "glyph": "z",
+        "contour": "z_c0",
+        "signed_area": 109788.3952682,
+        "direction": "ccw"
+      }
+    ],
+    "missing_codepoints": [],
+    "build": {
+      "artifact_id": "f9da574926744c66895d36335acd1ed4",
+      "revision": "c0e837a8e5394b86b4286e7f243861c5",
+      "formats": [
+        "ttf"
+      ],
+      "tables": [
+        "GPOS",
+        "GlyphOrder",
+        "OS/2",
+        "cmap",
+        "glyf",
+        "head",
+        "hhea",
+        "hmtx",
+        "loca",
+        "maxp",
+        "name",
+        "post"
+      ],
+      "engine": "fontmake + fontTools; unhinted static TrueType",
+      "versions": {
+        "fontmake": "3.12.1",
+        "fonttools": "4.64.0",
+        "ufoLib2": "0.18.1",
+        "ufo2ft": "3.9.0"
+      },
+      "files": {
+        "ttf": {
+          "path": "5c79bbb805cd4fe288f77a50b8a1b1fd/artifacts/f9da574926744c66895d36335acd1ed4/font.ttf",
+          "sha256": "6da05c566d25fc44cfaa286c6d9f67379e81640491c7ea163bdf1d6053a08ed5",
+          "bytes": 14888
+        }
+      }
+    }
+  },
+  "build": {
+    "artifact_id": "f5f090257fd54f62bb370b8f6f4e1e99",
+    "revision": "c0e837a8e5394b86b4286e7f243861c5",
+    "formats": [
+      "ttf",
+      "woff2"
+    ],
+    "tables": [
+      "GPOS",
+      "GlyphOrder",
+      "OS/2",
+      "cmap",
+      "glyf",
+      "head",
+      "hhea",
+      "hmtx",
+      "loca",
+      "maxp",
+      "name",
+      "post"
+    ],
+    "engine": "fontmake + fontTools; unhinted static TrueType",
+    "versions": {
+      "fontmake": "3.12.1",
+      "fonttools": "4.64.0",
+      "ufoLib2": "0.18.1",
+      "ufo2ft": "3.9.0"
+    },
+    "files": {
+      "woff2": {
+        "path": "5c79bbb805cd4fe288f77a50b8a1b1fd/artifacts/f5f090257fd54f62bb370b8f6f4e1e99/font.woff2",
+        "sha256": "832b0c5008190d83ea1d7b0fe9c44d649a49461812d462f6247e22499e26efd1",
+        "bytes": 6004
+      },
+      "ttf": {
+        "path": "5c79bbb805cd4fe288f77a50b8a1b1fd/artifacts/f5f090257fd54f62bb370b8f6f4e1e99/font.ttf",
+        "sha256": "6da05c566d25fc44cfaa286c6d9f67379e81640491c7ea163bdf1d6053a08ed5",
+        "bytes": 14888
+      }
+    }
+  },
+  "codepoints": 107,
+  "proof": "Miette aime les belles lettres",
+  "review": "agent; awaiting user visual feedback"
+}

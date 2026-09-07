@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "font-design": {
+      "command": "C:/Users/Administrator/IdeaProjects/font-design-mcp/.venv/Scripts/python.exe",
+      "args": ["-m", "font_design_mcp", "serve", "--workspace", "C:/Users/Administrator/IdeaProjects/font-design-mcp/workspace"]
+    }
+  }
+}
