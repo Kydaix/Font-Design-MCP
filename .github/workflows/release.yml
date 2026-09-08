@@ -10,9 +10,7 @@ jobs:
   publish:
     needs: checks
     runs-on: ubuntu-latest
-    environment: pypi
     permissions:
-      id-token: write
       contents: write
     steps:
       - uses: actions/checkout@v7
@@ -27,8 +25,6 @@ jobs:
       - run: uv build
       - run: uv run --frozen python scripts/check_distribution.py
       - run: uv run --frozen python scripts/test_wheel.py
-      - name: Publish wheel and sdist using OIDC
-        uses: pypa/gh-action-pypi-publish@release/v1
       - run: uv run --frozen python scripts/build_mcpb.py
       - name: Checksums
         run: sha256sum dist/* > SHA256SUMS

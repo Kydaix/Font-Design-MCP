@@ -99,8 +99,13 @@ def main():
     config = sub.add_parser("config", help="Print client JSON; does not edit client files")
     config.add_argument("--workspace", type=Path)
     config.add_argument(
-        "--from", dest="source", help="Wheel path or pinned Git URL; defaults to the versioned PyPI package"
+        "--from", dest="source", help="Wheel path or pinned Git URL; defaults to the GitHub release wheel"
     )
+    setup = sub.add_parser("install", help="Detect clients and register this installation of the MCP")
+    setup.add_argument("--clients", nargs="+", choices=("codex", "claude-code", "cursor"))
+    setup.add_argument("--workspace", type=Path)
+    setup.add_argument("--yes", action="store_true", help="Configure all detected clients without prompting")
+    setup.add_argument("--dry-run", action="store_true", help="Preview configuration changes without writing")
     args = parser.parse_args()
     logging.basicConfig(stream=sys.stderr, level=logging.WARNING)
     if args.command == "serve":
@@ -110,7 +115,10 @@ def main():
 
         anyio.run(serve, workspace_path(args.workspace))
     elif args.command == "config":
-        source = args.source or f"font-design-mcp=={__version__}"
+        source = args.source or (
+            f"https://github.com/Kydaix/Font-Design-MCP/releases/download/v{__version__}/"
+            f"font_design_mcp-{__version__}-py3-none-any.whl"
+        )
         print(
             json.dumps(
                 {
@@ -133,6 +141,13 @@ def main():
                 indent=2,
             )
         )
+    elif args.command == "install":
+        from .install import install
+
+        try:
+            install(args)
+        except (OSError, ValueError) as exc:
+            parser.exit(1, f"Installation failed: {exc}\n")
     else:
         report = doctor(args.build)
         print(json.dumps(report, indent=2))

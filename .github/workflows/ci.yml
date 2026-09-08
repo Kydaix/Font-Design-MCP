@@ -31,6 +31,7 @@ jobs:
       - run: uv build
       - run: uv run --frozen python scripts/check_distribution.py
       - run: uv run --frozen python scripts/test_wheel.py
+      - run: uv run --frozen python scripts/test_installer.py
       - run: uv run --frozen python scripts/build_mcpb.py
       - run: uv run --frozen python scripts/test_mcpb.py
       - run: uv run --frozen python scripts/check_registry.py

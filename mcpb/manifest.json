@@ -2,7 +2,7 @@
   "manifest_version": "0.4",
   "name": "font-design-mcp",
   "display_name": "Font Design MCP",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Draw local UFO fonts, edit variable masters, preview axes and export TTF/WOFF2.",
   "author": {"name": "Kydaix"},
   "repository": {"type": "git", "url": "https://github.com/Kydaix/Font-Design-MCP"},

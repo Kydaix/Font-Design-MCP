@@ -22,21 +22,37 @@ A local MCP server for AI-assisted type design, from vector outlines to TTF and 
 
 ## Get started
 
-Version **0.3.0** adds variable TTF/WOFF2 fonts, editable masters and previews at any axis location.
-The MCP keeps atomic edits, revision history, compilation caching and immutable resources.
-
-To use a built wheel without cloning, replace the wheel path below with your downloaded artifact:
+Version **0.4.0** adds installation directly from GitHub, with automatic client detection.
+With **Node.js 20+ and Git**, run:
 
 ```sh
-uvx --python 3.13 --from /absolute/path/font_design_mcp-0.3.0-py3-none-any.whl font-design-mcp doctor --build
-uvx --python 3.13 --from /absolute/path/font_design_mcp-0.3.0-py3-none-any.whl font-design-mcp config --from /absolute/path/font_design_mcp-0.3.0-py3-none-any.whl
+npx --yes github:Kydaix/Font-Design-MCP
 ```
 
-After 0.3.0 is published to PyPI, the equivalent command is
-`uvx --python 3.13 font-design-mcp@0.3.0 doctor --build`. Publication is prepared, not claimed here.
-`config --from /absolute/path/package.whl` prints a client configuration using that wheel;
-plain `config` targets the versioned PyPI package. It never changes client settings.
-The first UV invocation downloads dependencies; run `doctor --build` before connecting a host.
+The installer prepares uv and Python 3.13 if needed, installs the MCP in a persistent environment,
+detects **Codex, Claude Code and Cursor**, and asks which clients to configure. Restart those clients
+after installation. MCP tools belong to the client application and are available to its compatible models.
+
+```sh
+npx --yes github:Kydaix/Font-Design-MCP --clients codex cursor
+npx --yes github:Kydaix/Font-Design-MCP --yes
+npx --yes github:Kydaix/Font-Design-MCP --clients codex --dry-run
+```
+
+`--yes` selects all detected clients; `--clients` explicitly selects one or more, including `claude-code`.
+`--workspace /absolute/path` chooses where fonts are saved. `--dry-run` prepares the runtime but only
+previews client changes. Existing configuration files receive a `.font-design-<id>.bak` backup before
+atomic replacement. Other servers and existing per-server settings are preserved. Invalid configuration
+files are refused. Re-running the command updates the installation without duplicating server entries.
+An existing workspace is retained unless `--workspace` or `FONT_DESIGN_MCP_WORKSPACE` explicitly changes it.
+
+The installed runtime survives removal of the npm cache. Remove its MCP entry in a client to disconnect it;
+font projects remain in the workspace.
+The MCP is distributed through GitHub, without publishing to PyPI or npm. Python dependencies still
+download from their package index on first installation. Pin a checkout with `github:Kydaix/Font-Design-MCP#v0.4.0`.
+
+For manual setup, `font-design-mcp config` prints JSON using the versioned GitHub release wheel;
+`config --from /absolute/path/package.whl` uses a downloaded wheel. Neither command edits client files.
 
 `--workspace` overrides `FONT_DESIGN_MCP_WORKSPACE`, which overrides the dedicated user-data default:
 `%LOCALAPPDATA%/font-design-mcp/workspace` on Windows, `~/Library/Application Support/font-design-mcp/workspace`
@@ -52,7 +68,7 @@ The [MCPB extension](mcpb/manifest.json) targets hosts supporting the UV runtime
 3. [Connect your MCP client](#connect-a-client) to start designing with an agent.
 
 **Requirements:** Python 3.11–3.13, uv, and a GitHub account with access to this repository.
-Commands work in PowerShell and POSIX shells. Install from source; this version is not published to PyPI.
+Commands work in PowerShell and POSIX shells.
 
 ```sh
 git clone https://github.com/Kydaix/font-design-mcp.git
@@ -293,7 +309,7 @@ compiler failure, restart, and interrupted writes.
 
 | Verification | Evidence |
 | --- | --- |
-| **Windows 11 x64, Python 3.11** | 49 local tests passed, including variable interpolation, real STDIO calls, atomic edits, compilation caching, rendering, and recovery |
+| **Windows 11 x64, Python 3.11** | 53 local tests passed, including client installation, variable interpolation, real STDIO calls, atomic edits, rendering, and recovery |
 | **Windows, macOS, Linux runners** | [CI results](https://github.com/Kydaix/font-design-mcp/actions/workflows/ci.yml), covering Python 3.11 and 3.13 |
 | **Installed wheel** | Entry point and full MCP demo tested in a separate environment |
 | **MCPB extension** | Installed outside the repository; diagnostic, STDIO calls, and TTF/WOFF2 exports tested |

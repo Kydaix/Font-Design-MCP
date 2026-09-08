@@ -3,15 +3,13 @@
   "name": "io.github.Kydaix/font-design-mcp",
   "title": "Font Design MCP",
   "description": "Local UFO font design, variable fonts, previews and TTF/WOFF2 exports.",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "repository": {"url": "https://github.com/Kydaix/Font-Design-MCP", "source": "github"},
   "packages": [{
-    "registryType": "pypi", "identifier": "font-design-mcp", "version": "0.3.0",
-    "runtimeHint": "uvx", "transport": {"type": "stdio"},
-    "packageArguments": [{"type": "positional", "value": "serve"}],
-    "environmentVariables": [{
-      "name": "FONT_DESIGN_MCP_WORKSPACE", "description": "Absolute authorized font workspace (optional; user-data default).",
-      "isRequired": false, "format": "string"
-    }]
+    "registryType": "mcpb",
+    "identifier": "https://github.com/Kydaix/Font-Design-MCP/releases/download/v0.4.0/font-design-mcp-0.4.0.mcpb",
+    "version": "0.4.0",
+    "fileSha256": "78a7a11f0f09b8761389747a77a152f87f5cbf3769bec0342f53e274edf8799b",
+    "transport": {"type": "stdio"}
   }]
 }

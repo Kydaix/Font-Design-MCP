@@ -1,0 +1,11 @@
+{
+  "name": "font-design-mcp",
+  "version": "0.4.0",
+  "private": true,
+  "description": "Install Font Design MCP from GitHub and configure your AI clients",
+  "bin": {"font-design-mcp": "install.mjs"},
+  "engines": {"node": ">=20"},
+  "files": ["install.mjs", "pyproject.toml", "uv.lock", "requirements.lock", "src/font_design_mcp/*.py", "README.md", "LICENSE"],
+  "license": "MIT",
+  "repository": {"type": "git", "url": "https://github.com/Kydaix/Font-Design-MCP.git"}
+}

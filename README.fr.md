@@ -20,21 +20,39 @@ Un serveur MCP local pour créer des polices avec un agent IA, du dessin vectori
 
 ## Démarrer
 
-La version **0.3.0** ajoute les polices variables TTF/WOFF2, les masters éditables et les aperçus à toute position sur les axes.
-Le MCP conserve les éditions atomiques, l'historique, le cache de compilation et les ressources immuables.
-
-Pour utiliser un wheel construit sans cloner le dépôt, remplacez le chemin ci-dessous par celui du fichier téléchargé :
+La version **0.4.0** ajoute l'installation directe depuis GitHub, avec détection automatique des clients.
+Avec **Node.js 20+ et Git**, lancez :
 
 ```sh
-uvx --python 3.13 --from /chemin/absolu/font_design_mcp-0.3.0-py3-none-any.whl font-design-mcp doctor --build
-uvx --python 3.13 --from /chemin/absolu/font_design_mcp-0.3.0-py3-none-any.whl font-design-mcp config --from /chemin/absolu/font_design_mcp-0.3.0-py3-none-any.whl
+npx --yes github:Kydaix/Font-Design-MCP
 ```
 
-Après publication de 0.3.0 sur PyPI : `uvx --python 3.13 font-design-mcp@0.3.0 doctor --build`.
-La publication est préparée ; sa disponibilité n’est pas affirmée ici.
-`config --from /chemin/absolu/paquet.whl` imprime la configuration client utilisant ce wheel ;
-`config` seul cible le paquet PyPI versionné. Aucun fichier client n’est modifié.
-Lancez le diagnostic avant de connecter un hôte : le premier appel UV doit télécharger les dépendances.
+L'installateur prépare uv et Python 3.13 si nécessaire, installe le MCP dans un environnement persistant,
+détecte **Codex, Claude Code et Cursor**, puis demande lesquels configurer. Redémarrez les clients choisis.
+Le MCP se configure dans l'application cliente et devient accessible à ses modèles compatibles.
+
+```sh
+npx --yes github:Kydaix/Font-Design-MCP --clients codex cursor
+npx --yes github:Kydaix/Font-Design-MCP --yes
+npx --yes github:Kydaix/Font-Design-MCP --clients codex --dry-run
+```
+
+`--yes` choisit tous les clients détectés ; `--clients` en sélectionne explicitement un ou plusieurs,
+dont `claude-code`. `--workspace /chemin/absolu` choisit le dossier des polices. `--dry-run` prépare le
+runtime mais affiche seulement les changements de configuration. Chaque fichier existant reçoit une
+sauvegarde `.font-design-<id>.bak` avant remplacement atomique. Les autres serveurs et les réglages
+existants du serveur sont conservés. Un fichier invalide est refusé. Relancer la commande met à jour
+l'installation sans créer d'entrée en double.
+Le workspace existant est conservé, sauf changement explicite via `--workspace` ou `FONT_DESIGN_MCP_WORKSPACE`.
+
+Le runtime installé reste utilisable après suppression du cache npm. Retirez son entrée MCP dans un client
+pour le déconnecter. Les projets de polices restent
+dans leur workspace. Le MCP est distribué via GitHub, sans publication sur PyPI ni npm. Les dépendances
+Python restent téléchargées depuis leur index de paquets à la première installation.
+Pour figer une version : `github:Kydaix/Font-Design-MCP#v0.4.0`.
+
+Pour une configuration manuelle, `font-design-mcp config` imprime du JSON utilisant le wheel de la release
+GitHub ; `config --from /chemin/absolu/paquet.whl` utilise un wheel téléchargé. Ces commandes ne modifient aucun client.
 
 Priorité du workspace : `--workspace`, puis `FONT_DESIGN_MCP_WORKSPACE`, puis le dossier de données utilisateur :
 `%LOCALAPPDATA%/font-design-mcp/workspace` sous Windows, `~/Library/Application Support/font-design-mcp/workspace`
@@ -50,8 +68,7 @@ L’[extension MCPB](mcpb/manifest.json) vise les hôtes prenant en charge le ru
 3. [Connectez votre client MCP](#connecter-un-client) pour commencer à créer avec un agent.
 
 **Prérequis :** Python 3.11–3.13, uv et un compte GitHub disposant de l'accès à ce dépôt.
-Les commandes fonctionnent dans PowerShell et les shells POSIX. L'installation se fait depuis les sources ;
-cette version n'est pas publiée sur PyPI.
+Les commandes fonctionnent dans PowerShell et les shells POSIX.
 
 ```sh
 git clone https://github.com/Kydaix/font-design-mcp.git
@@ -303,7 +320,7 @@ interrompues.
 
 | Vérification | Résultat |
 | --- | --- |
-| **Windows 11 x64, Python 3.11** | 49 tests locaux réussis, dont interpolation variable, appels STDIO réels, éditions atomiques, cache de compilation, rendu et récupération |
+| **Windows 11 x64, Python 3.11** | 53 tests locaux réussis, dont installation des clients, interpolation variable, appels STDIO réels, éditions atomiques, rendu et récupération |
 | **Runners Windows, macOS et Linux** | [Résultats CI](https://github.com/Kydaix/font-design-mcp/actions/workflows/ci.yml), avec Python 3.11 et 3.13 |
 | **Wheel installé** | Commande d'entrée et démonstration MCP complète testées dans un environnement séparé |
 | **Extension MCPB** | Installée hors dépôt ; diagnostic, appels STDIO et exports TTF/WOFF2 testés |
