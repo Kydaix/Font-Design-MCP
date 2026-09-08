@@ -75,6 +75,9 @@ async def main():
             "UV_PYTHON_INSTALL_DIR": str(home / "python"),
             "UV_CACHE_DIR": str(home / "cache"),
         }
+        if os.name == "nt":
+            # Python uppercases Windows environment keys; exercise that inherited form.
+            env["PSMODULEPATH"] = str(home / "unusable-powershell-modules")
         # All generated runtime/config paths stay inside this temporary profile.
         command = [
             node,
