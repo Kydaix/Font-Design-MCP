@@ -37,5 +37,5 @@ lines += [
     "The locked versions and hashes are in uv.lock and requirements.lock.",
     "",
 ]
-(root / "docs").mkdir(exist_ok=True)
-(root / "docs" / "DEPENDENCIES.md").write_text("\n".join(lines), "utf-8")
+(root / "dist").mkdir(exist_ok=True)
+(root / "dist" / "DEPENDENCIES.md").write_text("\n".join(lines), "utf-8")

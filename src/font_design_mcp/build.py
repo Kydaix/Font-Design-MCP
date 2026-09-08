@@ -19,8 +19,9 @@ from fontTools.ttLib import TTFont
 from .domain import FontError, require
 from .storage import digest_tree, files_checked, read_json, safe_path, write_json
 from .telemetry import count, phase
+from .variable import validate_variable_binary, write_designspace
 
-CACHE_POLICY = "fontmake-ttf-no-autohint-keep-overlaps-original-names-v1"
+CACHE_POLICY = "fontmake-ttf-variable-no-autohint-keep-overlaps-original-names-v2"
 CACHE_LIMIT = 128_000_000
 
 
@@ -64,6 +65,8 @@ def compile_font(store, project_id, font, manifest, source, formats, retain=Fals
     """Serialize cache access across processes; return private bytes before releasing the lock."""
     identity = {
         "source": manifest["source_sha256"],
+        "variation": manifest.get("variation"),
+        "masters": manifest.get("master_sha256"),
         "revision": manifest["revision"],
         "created_at": manifest["created_at"],
         "policy": CACHE_POLICY,
@@ -94,6 +97,7 @@ def compile_font(store, project_id, font, manifest, source, formats, retain=Fals
                             "Corrupt cached font",
                         )
                         with TTFont(path, lazy=False) as binary:
+                            validate_variable_binary(binary, manifest.get("variation"))
                             require(
                                 binary.getBestCmap() == {u: g.name for g in font for u in g.unicodes},
                                 "build_failed",
@@ -182,15 +186,21 @@ def _compile_font(store, project_id, font, manifest, source, formats, artifacts,
     stage = safe_path(store.root, artifacts / (".stage-" + artifact_id))
     stage.mkdir()
     # A private compiler input guarantees no compiler can mutate authoritative sources.
-    font.save(stage / "input.ufo", formatVersion=3)
+    configuration = manifest.get("variation")
+    if configuration:
+        fonts = store.load_masters(project_id, manifest, font)
+        input_path = write_designspace(stage, configuration, fonts)
+    else:
+        input_path = stage / "input.ufo"
+        font.save(input_path, formatVersion=3)
     command = [
         sys.executable,
         "-m",
         "fontmake",
-        "-u",
-        str(stage / "input.ufo"),
+        "-m" if configuration else "-u",
+        str(input_path),
         "-o",
-        "ttf",
+        "variable" if configuration else "ttf",
         "--output-path",
         str(stage / "font.ttf"),
         "--no-autohint",
@@ -206,6 +216,7 @@ def _compile_font(store, project_id, font, manifest, source, formats, artifacts,
     ttf = stage / "font.ttf"
     require(ttf.is_file() and 0 < ttf.stat().st_size <= 16_000_000, "build_failed", "Invalid compiler output")
     with TTFont(ttf, lazy=False, recalcTimestamp=False) as binary:
+        validate_variable_binary(binary, configuration)
         required = {"head", "hhea", "maxp", "OS/2", "hmtx", "cmap", "name", "post", "glyf", "loca"}
         require(required.issubset(binary.keys()), "build_failed", "Missing required OpenType tables")
         require(binary.getGlyphOrder()[0] == ".notdef", "build_failed", "Glyph 0 must be .notdef")
@@ -222,6 +233,7 @@ def _compile_font(store, project_id, font, manifest, source, formats, artifacts,
             binary.save(stage / "font.woff2")
     if "woff2" in formats:
         with TTFont(stage / "font.woff2") as webfont:
+            validate_variable_binary(webfont, configuration)
             require(
                 webfont.getBestCmap() == {u: g.name for g in font for u in g.unicodes},
                 "build_failed",
@@ -232,13 +244,16 @@ def _compile_font(store, project_id, font, manifest, source, formats, artifacts,
         "external_modification",
         "Sources changed during compilation",
     )
+    store.verify(project_id, manifest["revision"])
     data = {
         "build_key": build_key,
         "artifact_id": artifact_id,
         "revision": manifest["revision"],
         "formats": list(dict.fromkeys(formats)),
         "tables": tables,
-        "engine": "fontmake + fontTools; unhinted static TrueType",
+        "engine": f"fontmake + fontTools; unhinted {'variable' if configuration else 'static'} TrueType",
+        "variable": bool(configuration),
+        "variation": configuration,
         "versions": {name: version(name) for name in ("fontmake", "fonttools", "ufoLib2", "ufo2ft")},
         "files": {
             fmt: {

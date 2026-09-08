@@ -1,4 +1,4 @@
-"""Copy unchanged demo PNGs into documentation with descriptive names and provenance."""
+"""Export unchanged demo PNGs into dist with descriptive names and provenance."""
 
 import argparse
 import json
@@ -11,8 +11,8 @@ args = parser.parse_args()
 root = Path(__file__).parents[1]
 project = root / "workspace" / args.project_id
 calls = json.loads((project / "demo-calls.json").read_text("utf-8"))
-output = root / "docs" / "captures"
-output.mkdir(exist_ok=True)
+output = root / "dist" / "captures"
+output.mkdir(parents=True, exist_ok=True)
 manifest = []
 for call in calls:
     if call["tool"] == "render_glyph":

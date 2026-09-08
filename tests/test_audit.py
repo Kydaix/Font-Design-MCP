@@ -355,7 +355,7 @@ def test_new_protocol_client(tmp_path):
         )
         async with Client(parameters, mode="2026-07-28") as session:
             tools = await session.list_tools()
-            assert len(tools.tools) == 14
+            assert len(tools.tools) == 15
             result = await session.call_tool("project_create", {"metadata": {"family": "Modern"}})
             assert result.structured_content["ok"]
 

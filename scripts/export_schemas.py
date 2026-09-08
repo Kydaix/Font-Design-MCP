@@ -19,7 +19,8 @@ async def main():
         async with ClientSession(read, write) as session:
             await session.initialize()
             result = await session.list_tools()
-            (root / "docs" / "tool-schemas.json").write_text(
+            (root / "dist").mkdir(exist_ok=True)
+            (root / "dist" / "tool-schemas.json").write_text(
                 json.dumps(result.model_dump(mode="json", by_alias=True, exclude_none=True), indent=2), "utf-8"
             )
             print(f"Exported {len(result.tools)} live tool schemas")

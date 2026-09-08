@@ -106,10 +106,12 @@ def glyph_frame(fonts, name):
     ]
 
 
-def shape(binary_bytes, text, kern=True):
+def shape(binary_bytes, text, kern=True, location=None):
     face = hb.Face(binary_bytes)
     font = hb.Font(face)
     hb.ot_font_set_funcs(font)
+    if location:
+        font.set_variations(location)
     font.scale = (face.upem, face.upem)
     buf = hb.Buffer()
     buf.flags = hb.BufferFlags.PRESERVE_DEFAULT_IGNORABLES
@@ -131,11 +133,19 @@ def shape(binary_bytes, text, kern=True):
 
 def text_view(binary_path, request, vertical_frame):
     data = binary_path if isinstance(binary_path, bytes) else binary_path.read_bytes()
-    positions = shape(data, request.text, request.kern)
     top, bottom = vertical_frame
     with TTFont(io.BytesIO(data)) as font:
+        axes = {a.axisTag: a for a in font["fvar"].axes} if "fvar" in font else {}
+        require(set(request.location) <= set(axes), "invalid_input", "Unknown variation axis")
+        location = {tag: request.location.get(tag, axis.defaultValue) for tag, axis in axes.items()}
+        require(
+            all(axes[tag].minValue <= value <= axes[tag].maxValue for tag, value in location.items()),
+            "invalid_input",
+            "Variation location outside axis range",
+        )
+        positions = shape(data, request.text, request.kern, location)
         upm = font["head"].unitsPerEm
-        glyphset = font.getGlyphSet()
+        glyphset = font.getGlyphSet(location=location or None)
         order, cmap = font.getGlyphOrder(), font.getBestCmap()
         missing = sorted({ord(ch) for ch in request.text if ord(ch) not in cmap})
         warnings = [f"Missing U+{u:04X}; no system font substitution" for u in missing]
@@ -174,6 +184,7 @@ def text_view(binary_path, request, vertical_frame):
             image.paste(row, (0, offset))
             offset += row.height
     return image, {
+        "location": location,
         "positions": positions,
         "missing_codepoints": missing,
         "advance_units": [sum(i["x_advance"] for i in positions), sum(i["y_advance"] for i in positions)],

@@ -224,6 +224,62 @@ class KernGroup(Model):
 
 Spacing = Annotated[SetAdvance | Bearings | KernPair | KernGroup, Field(discriminator="op")]
 
+AxisTag = Annotated[str, Field(pattern=r"^[A-Za-z][A-Za-z0-9]{3}$")]
+AxisValue = Annotated[float, Field(ge=-32768, le=32767, allow_inf_nan=False)]
+Location = Annotated[dict[AxisTag, AxisValue], Field(max_length=4)]
+
+
+class Axis(Model):
+    tag: AxisTag
+    name: str = Field(min_length=1, max_length=100, pattern=r"^[^\x00-\x1f]+$")
+    minimum: AxisValue
+    default: AxisValue
+    maximum: AxisValue
+
+    @model_validator(mode="after")
+    def bounds(self):
+        if not self.minimum <= self.default <= self.maximum or self.minimum == self.maximum:
+            raise ValueError("Require minimum <= default <= maximum and minimum < maximum")
+        return self
+
+
+class Master(Model):
+    id: ID
+    name: str = Field(min_length=1, max_length=100, pattern=r"^[^\x00-\x1f]+$")
+    location: Location
+
+
+class Variation(Model):
+    axes: list[Axis] = Field(min_length=1, max_length=4)
+    masters: list[Master] = Field(min_length=2, max_length=8)
+
+    @model_validator(mode="after")
+    def designspace(self):
+        tags = {axis.tag for axis in self.axes}
+        if len(tags) != len(self.axes) or len({a.name for a in self.axes}) != len(self.axes):
+            raise ValueError("Axis tags and names must be unique")
+        if len({s.id.casefold() for s in self.masters}) != len(self.masters):
+            raise ValueError("Master IDs must be unique, including on case-insensitive filesystems")
+        if len({s.name for s in self.masters}) != len(self.masters):
+            raise ValueError("Master names must be unique")
+        locations = []
+        for master in self.masters:
+            if set(master.location) != tags:
+                raise ValueError("Every master must specify every axis, with no unknown axes")
+            if any(not a.minimum <= master.location[a.tag] <= a.maximum for a in self.axes):
+                raise ValueError("Master location outside axis range")
+            locations.append(tuple(master.location[a.tag] for a in self.axes))
+        if len(set(locations)) != len(locations):
+            raise ValueError("Master locations must be unique")
+        default = next((s for s in self.masters if s.id == "default"), None)
+        if default is None or any(default.location[a.tag] != a.default for a in self.axes):
+            raise ValueError("Master 'default' must be at the axes' default location")
+        for axis in self.axes:
+            values = [s.location[axis.tag] for s in self.masters]
+            if min(values) != axis.minimum or max(values) != axis.maximum:
+                raise ValueError("Masters must cover each axis minimum and maximum")
+        return self
+
 
 class ProjectCreate(Model):
     metadata: Metadata
@@ -258,7 +314,12 @@ class ProjectUpdate(WriteRef):
     decision: Decision | None = None
 
 
+class VariableConfigure(WriteRef):
+    variation: Variation
+
+
 class GlyphGet(ReadRef):
+    master_id: ID = "default"
     glyph_id: GlyphID
     detail: Literal["summary", "full"] = "summary"
 
@@ -270,10 +331,12 @@ class GlyphChange(Model):
 
 
 class GlyphEdit(WriteRef, GlyphChange):
+    master_id: ID = "default"
     detail: Literal["summary", "full"] = "summary"
 
 
 class FontEdit(WriteRef):
+    master_id: ID = "default"
     glyphs: list[GlyphChange] = Field(min_length=1, max_length=128)
     spacing: list[Spacing] = Field(default_factory=list, max_length=128)
     detail: Literal["summary", "full"] = "summary"
@@ -288,6 +351,7 @@ class FontEdit(WriteRef):
 
 
 class SpacingEdit(WriteRef):
+    master_id: ID = "default"
     operations: list[Spacing] = Field(min_length=1, max_length=128)
 
 
@@ -301,6 +365,7 @@ class RenderGlyph(GlyphGet):
 
 
 class RenderText(ReadRef):
+    location: Location = Field(default_factory=dict)
     detail: Literal["summary", "positions", "full"] = "summary"
     image_mode: Literal["inline", "resource"] = "inline"
     compare_revision: Revision | None = None

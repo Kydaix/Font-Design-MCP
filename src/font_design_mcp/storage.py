@@ -18,7 +18,7 @@ from pydantic import TypeAdapter
 from ufoLib2 import Font
 
 from .domain import FontError, require, validate_font
-from .models import Revision
+from .models import Revision, Variation
 from .telemetry import count, phase
 
 REVISION = TypeAdapter(Revision)
@@ -244,7 +244,7 @@ class Store:
         require(
             manifest.get("revision") == revision
             and manifest.get("project_id") == project_id
-            and manifest.get("schema") == 1,
+            and manifest.get("schema") in (1, 2),
             "external_modification",
             "Invalid revision manifest",
         )
@@ -294,6 +294,19 @@ class Store:
             "external_modification",
             "UFO changed externally; restore your backup before editing",
         )
+        if "variation" in manifest:
+            variation = Variation.model_validate(manifest["variation"])
+            list(files_checked(self.root, folder))
+            for master in variation.masters:
+                if master.id == "default":
+                    continue
+                path = folder / "masters" / f"master-{master.id}.ufo"
+                digest = validate_ufo_files(self.root, path) if inspect_ufo else digest_tree(self.root, path)
+                require(
+                    digest == manifest["master_sha256"].get(master.id),
+                    "external_modification",
+                    f"Master {master.id} changed externally",
+                )
         return manifest, ufo
 
     @phase("load")
@@ -303,8 +316,21 @@ class Store:
         validate_font(font)
         return font, manifest, ufo
 
+    def load_masters(self, project_id, manifest, font):
+        """Materialize the additional masters only when editing or compiling a variable project."""
+        fonts = {"default": font}
+        if "variation" in manifest:
+            _, ufo = self.verify(project_id, manifest["revision"], inspect_ufo=True)
+            for master in manifest["variation"]["masters"]:
+                if master["id"] != "default":
+                    path = ufo.parent / "masters" / f"master-{master['id']}.ufo"
+                    other = Font.open(path, lazy=False, validate=True)
+                    validate_font(other)
+                    fonts[master["id"]] = other
+        return fonts
+
     @phase("commit")
-    def commit(self, project_id, font, extra, summary, expected=None):
+    def commit(self, project_id, font, extra, summary, expected=None, masters=None):
         """Caller holds project lock. Never overwrite a committed UFO."""
         validate_font(font)
         project = self.project(project_id)
@@ -320,7 +346,27 @@ class Store:
         stage.mkdir()
         ufo = stage / "source.ufo"
         font.save(ufo, formatVersion=3, validate=True)
-        for p in files_checked(self.root, ufo):
+        master_hashes = {}
+        if "variation" in extra:
+            variation = Variation.model_validate(extra["variation"])
+            require(
+                masters is not None and set(masters) == {s.id for s in variation.masters},
+                "missing_reference",
+                "Expected every configured master",
+            )
+            (stage / "masters").mkdir()
+            for master in variation.masters:
+                if master.id == "default":
+                    continue
+                other = masters[master.id]
+                validate_font(other)
+                path = stage / "masters" / f"master-{master.id}.ufo"
+                other.save(path, formatVersion=3, validate=True)
+                master_hashes[master.id] = digest_tree(self.root, path)
+                fsync_directory(path / "glyphs")
+                fsync_directory(path)
+            fsync_directory(stage / "masters")
+        for p in files_checked(self.root, stage):
             count("source_files_written")
             count("source_bytes_written", p.stat().st_size)
             with p.open("r+b") as stream:
@@ -328,7 +374,7 @@ class Store:
         fsync_directory(ufo / "glyphs")
         fsync_directory(ufo)
         manifest = {
-            "schema": 1,
+            "schema": 2 if "variation" in extra else 1,
             "project_id": project_id,
             "revision": revision,
             "parent": expected,
@@ -337,6 +383,7 @@ class Store:
             "summary": summary,
             "source_sha256": digest_tree(self.root, ufo),
             **extra,
+            **({"master_sha256": master_hashes} if master_hashes else {}),
         }
         write_json(stage / "manifest.json", manifest)
         fsync_directory(stage)

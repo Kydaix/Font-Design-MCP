@@ -18,7 +18,7 @@ def size(value):
     return len(json.dumps(value, ensure_ascii=False, separators=(",", ":")).encode("utf-8"))
 
 
-catalogue = json.loads((root / "docs" / "tool-schemas.json").read_text("utf-8"))
+catalogue = json.loads((root / "dist" / "tool-schemas.json").read_text("utf-8"))
 annotated = copy.deepcopy(catalogue)
 for tool in annotated["tools"]:
     tool["inputSchema"] = TOOLS[tool["name"]][0].model_json_schema()
@@ -68,5 +68,5 @@ with tempfile.TemporaryDirectory(prefix="font-output-size-") as folder:
         for detail in ("full", "summary"):
             result, _ = service.execute(tool, model(project_id=pid, detail=detail, **extra))
             report[tool][detail] = size(result.data)
-(root / "docs" / "audit-output-sizes.json").write_text(json.dumps(report, indent=2), "utf-8")
+(root / "dist" / "audit-output-sizes.json").write_text(json.dumps(report, indent=2), "utf-8")
 print(json.dumps(report, indent=2))

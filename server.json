@@ -2,11 +2,11 @@
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.Kydaix/font-design-mcp",
   "title": "Font Design MCP",
-  "description": "Local UFO font design, previews, atomic edits and TTF/WOFF2 exports.",
-  "version": "0.2.0",
+  "description": "Local UFO font design, variable fonts, previews and TTF/WOFF2 exports.",
+  "version": "0.3.0",
   "repository": {"url": "https://github.com/Kydaix/Font-Design-MCP", "source": "github"},
   "packages": [{
-    "registryType": "pypi", "identifier": "font-design-mcp", "version": "0.2.0",
+    "registryType": "pypi", "identifier": "font-design-mcp", "version": "0.3.0",
     "runtimeHint": "uvx", "transport": {"type": "stdio"},
     "packageArguments": [{"type": "positional", "value": "serve"}],
     "environmentVariables": [{

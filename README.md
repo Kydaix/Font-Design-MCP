@@ -14,7 +14,7 @@ A local MCP server for AI-assisted type design, from vector outlines to TTF and 
 
 **English** · [Français](README.fr.md)
 
-[Get started](#get-started) · [Connect a client](#connect-a-client) · [Documentation](#documentation) · [Report an issue](https://github.com/Kydaix/font-design-mcp/issues)
+[Get started](#get-started) · [Connect a client](#connect-a-client) · [Report an issue](https://github.com/Kydaix/font-design-mcp/issues)
 
 </div>
 
@@ -22,18 +22,18 @@ A local MCP server for AI-assisted type design, from vector outlines to TTF and 
 
 ## Get started
 
-Version **0.2.0** adds atomic multi-glyph edits, reusable TTF/WOFF2 compilations, compact responses,
-numeric drawing primitives and immutable MCP resources. See [upgrade notes and audit results](docs/AUDIT-IMPLEMENTATION.md).
+Version **0.3.0** adds variable TTF/WOFF2 fonts, editable masters and previews at any axis location.
+The MCP keeps atomic edits, revision history, compilation caching and immutable resources.
 
 To use a built wheel without cloning, replace the wheel path below with your downloaded artifact:
 
 ```sh
-uvx --python 3.13 --from /absolute/path/font_design_mcp-0.2.0-py3-none-any.whl font-design-mcp doctor --build
-uvx --python 3.13 --from /absolute/path/font_design_mcp-0.2.0-py3-none-any.whl font-design-mcp config --from /absolute/path/font_design_mcp-0.2.0-py3-none-any.whl
+uvx --python 3.13 --from /absolute/path/font_design_mcp-0.3.0-py3-none-any.whl font-design-mcp doctor --build
+uvx --python 3.13 --from /absolute/path/font_design_mcp-0.3.0-py3-none-any.whl font-design-mcp config --from /absolute/path/font_design_mcp-0.3.0-py3-none-any.whl
 ```
 
-After 0.2.0 is published to PyPI, the equivalent command is
-`uvx --python 3.13 font-design-mcp@0.2.0 doctor --build`. Publication is prepared, not claimed here.
+After 0.3.0 is published to PyPI, the equivalent command is
+`uvx --python 3.13 font-design-mcp@0.3.0 doctor --build`. Publication is prepared, not claimed here.
 `config --from /absolute/path/package.whl` prints a client configuration using that wheel;
 plain `config` targets the versioned PyPI package. It never changes client settings.
 The first UV invocation downloads dependencies; run `doctor --build` before connecting a host.
@@ -44,7 +44,6 @@ on macOS, `$XDG_DATA_HOME/font-design-mcp/workspace` (or `~/.local/share/...`) o
 The workspace stays outside UV's cache and survives upgrades or extension removal.
 
 The [MCPB extension](mcpb/manifest.json) targets hosts supporting the UV runtime in manifest 0.4.
-See [distribution and publication](docs/DISTRIBUTION.md) for building, tests and host-validation limits.
 
 ### Development from source
 
@@ -210,13 +209,14 @@ data, readable summaries, revisions, warnings, and identifiable errors.
 | `render_glyph` | Render a glyph with optional guides, handles, and revision comparison |
 | `render_text` | Compile, shape, and render text at multiple sizes |
 | `font_validate` | Check geometry, Unicode coverage, compilation, and OpenType tables |
-| `font_build` | Export TTF and/or WOFF2 from a frozen revision |
+| `font_build` | Export static or variable TTF and/or WOFF2 from a frozen revision |
+| `variable_configure` | Define continuous axes and clone/edit the project's master configuration |
 | `history_list` | Browse committed revisions and change summaries |
 | `history_restore` | Restore an earlier state by creating a new revision |
 
-[Exact JSON schemas](docs/tool-schemas.json) · [Detailed tool reference, in French](docs/TOOLS.md)
+Exact input and output schemas are available through MCP `tools/list`.
 
-In 0.2.0, inspection, glyph reads/edits, batch edits, validation, and renders default to
+Inspection, glyph reads/edits, batch edits, validation, and renders default to
 `detail="summary"`. Use `detail="full"` for complete data, including point IDs before editing them;
 `render_text` also accepts `detail="positions"`. Rendered images remain inline by default;
 `image_mode="resource"` returns references for retrieval through MCP resources.
@@ -248,14 +248,18 @@ for an external backup. Disk usage has no automatic global quota or history purg
 
 Coordinates use font units, baseline `y=0`, with Y pointing up. Advance, visible width, and side bearings are
 different measurements. UPM is fixed at creation. Closed contours use non-zero filling; counters need the
-opposite winding. See the [architecture and recovery notes, in French](docs/ARCHITECTURE.md) for details.
+opposite winding.
 
 ## Supported formats and limits
 
-**Current scope:** static fonts with one master, freeform closed contours, components, anchors, and kerning.
+**Current scope:** static and variable TTF/WOFF2 fonts, freeform closed contours, components, anchors, and kerning.
 Text is shaped with HarfBuzz from a compiled TTF and rasterized with FreeType/Pillow, without system-font fallback.
 
-**Not supported in this version:** OTF, variable fonts, multiple masters, arbitrary UFO/SVG import, image
+For variable fonts, `variable_configure` defines axes and clones masters within the same project.
+Editing tools accept `master_id`, `render_text` accepts `location: {"wght": 500}`, and `font_build`
+automatically exports a variable font. Up to 4 continuous axes and 8 masters, subject to source size limits.
+
+**Not supported in this version:** OTF, arbitrary UFO/SVG import, image
 tracing, editor adapters, collaborative networking, and a full graphical editor. No hinting or arbitrary
 OpenType feature code is exposed. Text previews are single-line specimens, not paragraph layout.
 
@@ -289,33 +293,17 @@ compiler failure, restart, and interrupted writes.
 
 | Verification | Evidence |
 | --- | --- |
-| **Windows 11 x64, Python 3.11** | 36 local tests passed, including real STDIO calls, atomic multi-glyph edits, compilation caching, rendering, and recovery |
+| **Windows 11 x64, Python 3.11** | 49 local tests passed, including variable interpolation, real STDIO calls, atomic edits, compilation caching, rendering, and recovery |
 | **Windows, macOS, Linux runners** | [CI results](https://github.com/Kydaix/font-design-mcp/actions/workflows/ci.yml), covering Python 3.11 and 3.13 |
 | **Installed wheel** | Entry point and full MCP demo tested in a separate environment |
 | **MCPB extension** | Installed outside the repository; diagnostic, STDIO calls, and TTF/WOFF2 exports tested |
 
-The CI result covers its runner environments, not every OS version or CPU architecture. The
-[original delivery report, in French](docs/TESTING.md) records the local tests before CI was first run.
-
-## Documentation
-
-English is the default README language; a [French README](README.fr.md) is also maintained. The detailed
-guides currently remain in French, except the dependency inventory and machine-readable schemas.
-
-| Reference | Contents |
-|---|---|
-| [Tool reference](docs/TOOLS.md) | Input conventions, vector operations, spacing, results, and error codes |
-| [JSON schemas](docs/tool-schemas.json) | Schemas exported from a live `tools/list` call |
-| [Architecture](docs/ARCHITECTURE.md) | Domain, persistence, rendering, compilation, limits, and recovery |
-| [Test report](docs/TESTING.md) | Original acceptance evidence, captures, and remaining visual review |
-| [Dependency licenses](docs/DEPENDENCIES.md) | Locked dependencies and native-library notices |
-| [Technical audit](docs/audit.md) | Performance, output size and installation findings |
-| [Audit implementation](docs/AUDIT-IMPLEMENTATION.md) | Changes, measurements and remaining publication/host checks |
+The CI result covers its runner environments, not every OS version or CPU architecture.
 
 ## Credits and license
 
 Built with the official MCP Python SDK, UFO sources, HarfBuzz, and FreeType/Pillow.
-See [dependency licenses](docs/DEPENDENCIES.md) for third-party notices.
+Third-party notices are included in the installed dependency packages.
 
 The server code and original examples are [MIT licensed](LICENSE). **This does not automatically license
 fonts you create with the server.** Font license metadata is empty by default and remains under the creator's

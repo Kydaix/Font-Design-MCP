@@ -21,6 +21,9 @@ INSTRUCTIONS = """Create and edit Unicode UFO projects using explicit project ID
 Coordinates are font units, baseline y=0, Y upwards; advance differs from visible width.
 Read stable IDs with glyph_get(detail=full) before moving points. Prefer font_edit for several glyphs;
 use stroke_path/filled_path/primitive for drawings and point operations for optical corrections.
+For variable fonts, draw the default master, call variable_configure to define axes and clone masters,
+then edit each master via master_id. Keep contour/point order, components and glyph sets compatible.
+font_build exports a variable TTF/WOFF2 automatically; render_text(location={"wght": 550}) previews axes.
 Responses default to summaries; request full details or read returned immutable report URIs when needed.
 Define brief/coverage, explore structural glyphs, compare proportions and optical corrections,
 set side bearings before kerning, test words before expanding coverage. Log decisions with project_update.

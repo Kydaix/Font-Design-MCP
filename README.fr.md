@@ -12,7 +12,7 @@ Un serveur MCP local pour créer des polices avec un agent IA, du dessin vectori
 
 [English](README.md) · **Français**
 
-[Démarrer](#démarrer) · [Connecter un client](#connecter-un-client) · [Documentation](#documentation) · [Signaler un problème](https://github.com/Kydaix/font-design-mcp/issues)
+[Démarrer](#démarrer) · [Connecter un client](#connecter-un-client) · [Signaler un problème](https://github.com/Kydaix/font-design-mcp/issues)
 
 </div>
 
@@ -20,17 +20,17 @@ Un serveur MCP local pour créer des polices avec un agent IA, du dessin vectori
 
 ## Démarrer
 
-La version **0.2.0** ajoute les transactions multi-glyphes, le cache TTF/WOFF2, les réponses compactes,
-les primitives de dessin et les ressources MCP immuables. Voir le [suivi de l’audit](docs/AUDIT-IMPLEMENTATION.md).
+La version **0.3.0** ajoute les polices variables TTF/WOFF2, les masters éditables et les aperçus à toute position sur les axes.
+Le MCP conserve les éditions atomiques, l'historique, le cache de compilation et les ressources immuables.
 
 Pour utiliser un wheel construit sans cloner le dépôt, remplacez le chemin ci-dessous par celui du fichier téléchargé :
 
 ```sh
-uvx --python 3.13 --from /chemin/absolu/font_design_mcp-0.2.0-py3-none-any.whl font-design-mcp doctor --build
-uvx --python 3.13 --from /chemin/absolu/font_design_mcp-0.2.0-py3-none-any.whl font-design-mcp config --from /chemin/absolu/font_design_mcp-0.2.0-py3-none-any.whl
+uvx --python 3.13 --from /chemin/absolu/font_design_mcp-0.3.0-py3-none-any.whl font-design-mcp doctor --build
+uvx --python 3.13 --from /chemin/absolu/font_design_mcp-0.3.0-py3-none-any.whl font-design-mcp config --from /chemin/absolu/font_design_mcp-0.3.0-py3-none-any.whl
 ```
 
-Après publication de 0.2.0 sur PyPI : `uvx --python 3.13 font-design-mcp@0.2.0 doctor --build`.
+Après publication de 0.3.0 sur PyPI : `uvx --python 3.13 font-design-mcp@0.3.0 doctor --build`.
 La publication est préparée ; sa disponibilité n’est pas affirmée ici.
 `config --from /chemin/absolu/paquet.whl` imprime la configuration client utilisant ce wheel ;
 `config` seul cible le paquet PyPI versionné. Aucun fichier client n’est modifié.
@@ -42,7 +42,6 @@ sous macOS, `$XDG_DATA_HOME/font-design-mcp/workspace` (ou `~/.local/share/...`)
 Ce dossier reste indépendant du cache UV et survit aux mises à jour et à la suppression de l’extension.
 
 L’[extension MCPB](mcpb/manifest.json) vise les hôtes prenant en charge le runtime UV du manifeste 0.4.
-Voir la [distribution et publication](docs/DISTRIBUTION.md) pour la construction et les limites des tests d’hôtes.
 
 ### Développement depuis les sources
 
@@ -214,13 +213,14 @@ données structurées, des résumés lisibles, les révisions, les avertissement
 | `render_glyph` | Rendre un glyphe avec repères, poignées et comparaison de révisions facultatifs |
 | `render_text` | Compiler, composer et rendre un texte à plusieurs tailles |
 | `font_validate` | Vérifier géométrie, couverture Unicode, compilation et tables OpenType |
-| `font_build` | Exporter en TTF et/ou WOFF2 depuis une révision figée |
+| `font_build` | Exporter en TTF et/ou WOFF2 statique ou variable depuis une révision figée |
+| `variable_configure` | Définir les axes continus et configurer les masters du projet |
 | `history_list` | Consulter les révisions commises et résumés de changements |
 | `history_restore` | Restaurer un état antérieur dans une nouvelle révision |
 
-[Schémas JSON exacts](docs/tool-schemas.json) · [Référence détaillée des outils](docs/TOOLS.md)
+Les schémas exacts des entrées et sorties sont disponibles via l'appel MCP `tools/list`.
 
-En 0.2.0, l'inspection, la lecture/édition de glyphes, les lots, la validation et les rendus utilisent
+L'inspection, la lecture/édition de glyphes, les lots, la validation et les rendus utilisent
 `detail="summary"` par défaut. Demandez `detail="full"` pour les données complètes, notamment les IDs
 des points avant de les modifier ; `render_text` accepte aussi `detail="positions"`. Les images restent
 incluses par défaut ; `image_mode="resource"` renvoie des références à récupérer via les ressources MCP.
@@ -254,16 +254,19 @@ Il n'y a ni quota disque global automatique ni purge de l'historique.
 
 Les coordonnées sont en unités de police, ligne de base `y=0`, axe Y vers le haut. Avance, largeur visible
 et approches sont des mesures différentes. UPM est fixé à la création. Les contours fermés utilisent le
-remplissage non-zero ; les contreformes nécessitent une orientation opposée. Les détails sont dans les
-[notes d'architecture et de récupération](docs/ARCHITECTURE.md).
+remplissage non-zero ; les contreformes nécessitent une orientation opposée.
 
 ## Formats pris en charge et limites
 
-**Périmètre actuel :** polices statiques à un master, contours fermés libres, composants, ancres et crénage.
+**Périmètre actuel :** polices statiques et variables TTF/WOFF2, contours fermés libres, composants, ancres et crénage.
 Le texte est composé par HarfBuzz depuis un TTF compilé et rasterisé avec FreeType/Pillow, sans substitution
 par une police système.
 
-**Non pris en charge dans cette version :** OTF, polices variables, plusieurs masters, import UFO/SVG
+Pour une police variable, `variable_configure` définit les axes et clone les masters dans le même projet.
+Les outils d'édition acceptent `master_id`, `render_text` accepte `location: {"wght": 500}` et `font_build`
+exporte automatiquement le fichier variable. Jusqu'à 4 axes continus et 8 masters, sous les limites de taille des sources.
+
+**Non pris en charge dans cette version :** OTF, import UFO/SVG
 arbitraire, traçage d'image, adaptateurs d'éditeurs, collaboration réseau et éditeur graphique complet.
 Ni hinting ni code de fonctions OpenType arbitraire ne sont exposés. Les aperçus de texte sont des spécimens
 sur une ligne, sans mise en page de paragraphes.
@@ -300,34 +303,17 @@ interrompues.
 
 | Vérification | Résultat |
 | --- | --- |
-| **Windows 11 x64, Python 3.11** | 36 tests locaux réussis, dont appels STDIO réels, éditions multi-glyphes atomiques, cache de compilation, rendu et récupération |
+| **Windows 11 x64, Python 3.11** | 49 tests locaux réussis, dont interpolation variable, appels STDIO réels, éditions atomiques, cache de compilation, rendu et récupération |
 | **Runners Windows, macOS et Linux** | [Résultats CI](https://github.com/Kydaix/font-design-mcp/actions/workflows/ci.yml), avec Python 3.11 et 3.13 |
 | **Wheel installé** | Commande d'entrée et démonstration MCP complète testées dans un environnement séparé |
 | **Extension MCPB** | Installée hors dépôt ; diagnostic, appels STDIO et exports TTF/WOFF2 testés |
 
 Le résultat CI couvre les environnements de ses runners, pas toutes les versions d'OS ou architectures CPU.
-Le [rapport de livraison initial](docs/TESTING.md) conserve les résultats locaux antérieurs à la première CI.
-
-## Documentation
-
-L'anglais est la langue par défaut du [README principal](README.md). Cette version française reprend le même
-parcours. Les guides détaillés restent actuellement en français, sauf l'inventaire des dépendances et les
-schémas lisibles par les clients.
-
-| Référence | Contenu |
-|---|---|
-| [Référence des outils](docs/TOOLS.md) | Conventions d'entrée, opérations vectorielles, espacement, résultats et erreurs |
-| [Schémas JSON](docs/tool-schemas.json) | Schémas exportés depuis un appel réel à `tools/list` |
-| [Architecture](docs/ARCHITECTURE.md) | Domaine, persistance, rendu, compilation, limites et récupération |
-| [Rapport de tests](docs/TESTING.md) | Preuves d'acceptation initiales, captures et revue visuelle restante |
-| [Licences des dépendances](docs/DEPENDENCIES.md) | Dépendances verrouillées et mentions des bibliothèques natives |
-| [Audit technique](docs/audit.md) | Performances, volume des réponses et installation |
-| [Mise en œuvre de l’audit](docs/AUDIT-IMPLEMENTATION.md) | Changements, mesures et vérifications de publication/hôtes restantes |
 
 ## Crédits et licence
 
 Construit avec le SDK Python MCP officiel, les sources UFO, HarfBuzz et FreeType/Pillow.
-Les mentions des bibliothèques tierces figurent dans les [licences des dépendances](docs/DEPENDENCIES.md).
+Les mentions des bibliothèques tierces sont incluses dans les paquets de dépendances installés.
 
 Le code du serveur et les exemples originaux sont sous [licence MIT](LICENSE). **Cette licence ne s'applique
 pas automatiquement aux polices que vous créez avec le serveur.** Les métadonnées de licence des polices

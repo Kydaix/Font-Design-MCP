@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "font-design-mcp"
-version = "0.2.0"
+version = "0.3.0"
 description = "Local deterministic UFO font editing over MCP STDIO"
 readme = "README.md"
 license = "MIT"
@@ -41,4 +41,4 @@ line-length = 110
 select = ["E4", "E7", "E9", "F", "I"]
 
 [tool.hatch.build.targets.sdist]
-include = ["/src", "/tests", "/examples", "/scripts", "/docs", "/mcpb", "/server.json", "/pyproject.toml", "/uv.lock", "/requirements.lock", "/README.md", "/README.fr.md", "/LICENSE", "/.github"]
+include = ["/src", "/tests", "/examples", "/scripts", "/mcpb", "/server.json", "/pyproject.toml", "/uv.lock", "/requirements.lock", "/README.md", "/README.fr.md", "/LICENSE", "/.github"]

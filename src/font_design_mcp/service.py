@@ -2,6 +2,7 @@
 
 import uuid
 from contextlib import ExitStack
+from copy import deepcopy
 from itertools import dropwhile, islice
 
 from . import models as m
@@ -26,6 +27,8 @@ CAPABILITIES = {
     "formats": ["ttf", "woff2"],
     "transport": "stdio",
     "static_single_master": True,
+    "variable_fonts": True,
+    "variable_limits": {"axes": 4, "masters": 8},
     "curves": ["line", "cubic", "quadratic"],
     "fill_rule": "nonzero",
     "precomposed_components": True,
@@ -58,25 +61,30 @@ TOOLS = {
         False,
         "Atomically update metadata, brief or decision journal. Requires expected_revision. UPM changes on nonempty fonts fail.",
     ),
+    "variable_configure": (
+        m.VariableConfigure,
+        False,
+        "Configure continuous axes and masters in this project. Master 'default' is the existing source at the default location. New IDs clone it; existing IDs keep their drawings; omitted IDs are removed in a new revision. Edit masters with master_id. Compatibility is checked at build/validation time.",
+    ),
     "glyph_get": (
         m.GlyphGet,
         True,
-        "Read glyph metrics in font units, Y upwards. Use detail=full for contour/point/component/anchor IDs and geometry.",
+        "Read a master's glyph metrics in font units, Y upwards. master_id defaults to 'default'. Use detail=full for contour/point/component/anchor IDs and geometry.",
     ),
     "glyph_edit": (
         m.GlyphEdit,
         False,
-        "Apply typed vector operations or bounded numeric drawing primitives atomically to one glyph. Use detail=full for added/removed/touched IDs. Replacements are explicit.",
+        "Apply typed vector operations or drawing primitives atomically to one glyph in master_id (default: 'default'). Use detail=full for added/removed/touched IDs. Replacements are explicit.",
     ),
     "spacing_edit": (
         m.SpacingEdit,
         False,
-        "Atomically set advances, both side bearings, kerning groups or pairs. Bearings move outlines; advances do not.",
+        "Atomically set advances, side bearings, kerning groups or pairs in master_id (default: 'default'). Bearings move outlines; advances do not.",
     ),
     "font_edit": (
         m.FontEdit,
         False,
-        "Edit up to 128 glyphs atomically, in array order, then apply spacing. Forward component references resolve at final validation; any failure rolls back the entire batch.",
+        "Edit up to 128 glyphs atomically in master_id (default: 'default'), then apply spacing. Forward component references resolve at final validation; any failure rolls back the batch.",
     ),
     "render_glyph": (
         m.RenderGlyph,
@@ -86,7 +94,7 @@ TOOLS = {
     "render_text": (
         m.RenderText,
         False,
-        "Compile the revision, shape with HarfBuzz and return monochrome FreeType PNGs. Missing Unicode is reported; no fallback font. Optional same-conditions revision comparison.",
+        "Compile the revision, shape with HarfBuzz and return FreeType PNGs. For variable fonts, location maps axis tags to values; omitted axes use defaults. Missing Unicode is reported. Optional same-conditions revision comparison.",
     ),
     "font_validate": (
         m.Validate,
@@ -96,7 +104,7 @@ TOOLS = {
     "font_build": (
         m.Build,
         False,
-        "Build real TTF and/or WOFF2 from a frozen revision. Returns persistent relative paths and hashes. Does not alter UFO sources.",
+        "Build real TTF and/or WOFF2 from a frozen revision, automatically variable when axes/masters are configured. Returns persistent relative paths and hashes. Does not alter sources.",
     ),
     "history_list": (
         m.Page,
@@ -142,6 +150,14 @@ class Service:
             revision = getattr(request, "revision", None)
             font, manifest, source = self.store.load(request.project_id, revision)
             project_id, revision = request.project_id, manifest["revision"]
+            master_id = getattr(request, "master_id", "default")
+            fonts = (
+                self.store.load_masters(project_id, manifest, font)
+                if isinstance(request, m.WriteRef) or master_id != "default"
+                else {"default": font}
+            )
+            require(master_id in fonts, "missing_reference", f"Unknown master {master_id}")
+            font = fonts[master_id]
             result = m.Result(ok=True, summary=f"{name} completed", project_id=project_id, revision=revision)
             if isinstance(request, m.WriteRef):
                 require(
@@ -150,13 +166,16 @@ class Service:
                     f"Expected {request.expected_revision}; current revision is {revision}",
                 )
                 extra = {"brief": manifest["brief"], "decisions": list(manifest["decisions"])}
+                if "variation" in manifest:
+                    extra["variation"] = manifest["variation"]
                 if name == "project_update":
                     require(
                         request.metrics is None or request.metrics.units_per_em == font.info.unitsPerEm,
                         "capability_unavailable",
                         "UPM is fixed after creation; no implicit rescaling",
                     )
-                    set_info(font, request.metadata, request.metrics)
+                    for master_font in fonts.values():
+                        set_info(master_font, request.metadata, request.metrics)
                     if request.brief is not None:
                         extra["brief"] = request.brief
                     if request.decision:
@@ -165,6 +184,14 @@ class Service:
                         )
                         extra["decisions"].append(request.decision.model_dump())
                     result.changed = ["project"]
+                elif name == "variable_configure":
+                    extra["variation"] = request.variation.model_dump()
+                    fonts = {
+                        master.id: fonts[master.id] if master.id in fonts else deepcopy(fonts["default"])
+                        for master in request.variation.masters
+                    }
+                    result.changed = ["variation"]
+                    result.data = extra["variation"]
                 elif name == "glyph_edit":
                     result.data = edit_glyph(font, request)
                     result.changed = [request.glyph_id]
@@ -193,13 +220,18 @@ class Service:
                     result.changed = result.data["touched_ids"]
                 elif name == "history_restore":
                     font, restored, _ = self.store.load(project_id, request.target_revision)
+                    fonts = self.store.load_masters(project_id, restored, font)
                     extra = {
                         "brief": restored["brief"],
                         "decisions": restored["decisions"],
                         "restored_from": request.target_revision,
                     }
+                    if "variation" in restored:
+                        extra["variation"] = restored["variation"]
                     result.changed = ["project"]
-                new = self.store.commit(project_id, font, extra, request.summary or name, revision)
+                new = self.store.commit(
+                    project_id, fonts["default"], extra, request.summary or name, revision, masters=fonts
+                )
                 result.revision = new["revision"]
                 result.summary = f"Committed {name}: {len(result.changed)} changed item(s)"
                 if getattr(request, "detail", "full") == "summary":
@@ -215,6 +247,7 @@ class Service:
                 names = sorted(font.keys())
                 result.data = {
                     "capabilities": CAPABILITIES,
+                    "variation": manifest.get("variation"),
                     "brief": manifest["brief"],
                     "decisions": manifest["decisions"],
                     "family": font.info.familyName,
@@ -235,7 +268,8 @@ class Service:
                 }
                 if name == "project_inspect" and request.detail == "summary":
                     result.data = {
-                        k: result.data[k] for k in ("family", "style", "units_per_em", "metrics", "total")
+                        k: result.data[k]
+                        for k in ("family", "style", "units_per_em", "metrics", "total", "variation")
                     }
             elif name == "glyph_get":
                 require(request.glyph_id in font, "missing_reference", f"Missing glyph {request.glyph_id}")
@@ -311,7 +345,12 @@ class Service:
             elif name in ("render_glyph", "render_text"):
                 sources = [(font, manifest, source)]
                 if request.compare_revision:
-                    sources.append(self.store.load(project_id, request.compare_revision))
+                    other, version, ufo = self.store.load(project_id, request.compare_revision)
+                    if master_id != "default":
+                        other_fonts = self.store.load_masters(project_id, version, other)
+                        require(master_id in other_fonts, "missing_reference", f"Unknown master {master_id}")
+                        other = other_fonts[master_id]
+                    sources.append((other, version, ufo))
                 locks.close()
                 parameters = request.model_dump(exclude={"project_id", "revision", "compare_revision"})
                 if name == "render_glyph":
@@ -364,6 +403,7 @@ class Service:
                                 "missing_codepoints",
                                 "advance_units",
                                 "metrics",
+                                "location",
                             }
                             or (k == "positions" and request.detail == "positions")
                         }

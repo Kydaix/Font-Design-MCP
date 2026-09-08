@@ -77,7 +77,7 @@ def assert_protocol(root):
 async def scenario(root):
     async with client(root) as session:
         discovery = await session.list_tools()
-        assert len(discovery.tools) == 14
+        assert len(discovery.tools) == 15
         assert all(tool.input_schema and tool.output_schema for tool in discovery.tools)
         assert next(t for t in discovery.tools if t.name == "glyph_get").annotations.read_only_hint
         assert not next(t for t in discovery.tools if t.name == "render_glyph").annotations.read_only_hint
