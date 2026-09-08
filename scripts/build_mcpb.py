@@ -18,6 +18,7 @@ output.parent.mkdir(exist_ok=True)
 with zipfile.ZipFile(output, "w", compression=zipfile.ZIP_STORED) as archive:
     for name, path in sorted(files.items()):
         info = zipfile.ZipInfo(name, date_time=(2026, 1, 1, 0, 0, 0))
+        info.create_system = 3  # Fixed Unix metadata, including when built on Windows.
         info.compress_type = zipfile.ZIP_STORED
         info.external_attr = 0o644 << 16
         data = path.read_bytes()
