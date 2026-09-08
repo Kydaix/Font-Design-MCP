@@ -1,6 +1,6 @@
 {
   "name": "font-design-mcp",
-  "version": "0.4.1",
+  "version": "0.4.2",
   "private": true,
   "description": "Install Font Design MCP from GitHub and configure your AI clients",
   "bin": {"font-design-mcp": "install.mjs"},

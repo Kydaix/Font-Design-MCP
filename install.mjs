@@ -47,6 +47,8 @@ async function findUv() {
     writeFileSync(script, await response.text());
     const env = { ...process.env, UV_UNMANAGED_INSTALL: bin };
     if (windows) {
+      // PowerShell 7 module paths can break the Windows PowerShell 5 bootstrap.
+      env.PSModulePath = join(process.env.SystemRoot || "C:\\Windows", "System32", "WindowsPowerShell", "v1.0", "Modules");
       run("powershell.exe", ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", script], { env });
     } else {
       run("/bin/sh", [script], { env });
