@@ -1,91 +1,11 @@
 {
+  "ttlMs": 0,
+  "cacheScope": "private",
   "tools": [
     {
       "name": "project_create",
       "description": "Create a project in the launch workspace with Unicode UFO sources and technical glyphs.",
       "inputSchema": {
-        "$defs": {
-          "Metadata": {
-            "additionalProperties": false,
-            "properties": {
-              "family": {
-                "maxLength": 100,
-                "minLength": 1,
-                "pattern": "^[^\\x00-\\x1f]+$",
-                "title": "Family",
-                "type": "string"
-              },
-              "style": {
-                "default": "Regular",
-                "maxLength": 100,
-                "minLength": 1,
-                "pattern": "^[^\\x00-\\x1f]+$",
-                "title": "Style",
-                "type": "string"
-              },
-              "copyright": {
-                "default": "",
-                "maxLength": 1000,
-                "title": "Copyright",
-                "type": "string"
-              },
-              "license_text": {
-                "default": "",
-                "maxLength": 4000,
-                "title": "License Text",
-                "type": "string"
-              }
-            },
-            "required": [
-              "family"
-            ],
-            "title": "Metadata",
-            "type": "object"
-          },
-          "Metrics": {
-            "additionalProperties": false,
-            "properties": {
-              "units_per_em": {
-                "default": 1000,
-                "maximum": 4096,
-                "minimum": 16,
-                "title": "Units Per Em",
-                "type": "integer"
-              },
-              "ascender": {
-                "default": 800,
-                "maximum": 16000,
-                "minimum": -16000,
-                "title": "Ascender",
-                "type": "number"
-              },
-              "descender": {
-                "default": -200,
-                "maximum": 16000,
-                "minimum": -16000,
-                "title": "Descender",
-                "type": "number"
-              },
-              "cap_height": {
-                "default": 700,
-                "maximum": 16000,
-                "minimum": -16000,
-                "title": "Cap Height",
-                "type": "number"
-              },
-              "x_height": {
-                "default": 500,
-                "maximum": 16000,
-                "minimum": -16000,
-                "title": "X Height",
-                "type": "number"
-              }
-            },
-            "title": "Metrics",
-            "type": "object"
-          }
-        },
-        "additionalProperties": false,
         "properties": {
           "metadata": {
             "$ref": "#/$defs/Metadata"
@@ -96,25 +16,91 @@
           "brief": {
             "default": "",
             "maxLength": 4000,
-            "title": "Brief",
             "type": "string"
           }
         },
         "required": [
           "metadata"
         ],
-        "title": "ProjectCreate",
-        "type": "object"
+        "type": "object",
+        "$defs": {
+          "Metadata": {
+            "additionalProperties": false,
+            "properties": {
+              "family": {
+                "maxLength": 100,
+                "minLength": 1,
+                "pattern": "^[^\\x00-\\x1f]+$",
+                "type": "string"
+              },
+              "style": {
+                "default": "Regular",
+                "maxLength": 100,
+                "minLength": 1,
+                "pattern": "^[^\\x00-\\x1f]+$",
+                "type": "string"
+              },
+              "copyright": {
+                "default": "",
+                "maxLength": 1000,
+                "type": "string"
+              },
+              "license_text": {
+                "default": "",
+                "maxLength": 4000,
+                "type": "string"
+              }
+            },
+            "required": [
+              "family"
+            ],
+            "type": "object"
+          },
+          "Metrics": {
+            "additionalProperties": false,
+            "properties": {
+              "units_per_em": {
+                "default": 1000,
+                "maximum": 4096,
+                "minimum": 16,
+                "type": "integer"
+              },
+              "ascender": {
+                "default": 800,
+                "maximum": 16000,
+                "minimum": -16000,
+                "type": "number"
+              },
+              "descender": {
+                "default": -200,
+                "maximum": 16000,
+                "minimum": -16000,
+                "type": "number"
+              },
+              "cap_height": {
+                "default": 700,
+                "maximum": 16000,
+                "minimum": -16000,
+                "type": "number"
+              },
+              "x_height": {
+                "default": 500,
+                "maximum": 16000,
+                "minimum": -16000,
+                "type": "number"
+              }
+            },
+            "type": "object"
+          }
+        },
+        "additionalProperties": false
       },
       "outputSchema": {
-        "additionalProperties": false,
         "properties": {
           "ok": {
-            "title": "Ok",
             "type": "boolean"
           },
           "summary": {
-            "title": "Summary",
             "type": "string"
           },
           "project_id": {
@@ -126,8 +112,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "title": "Project Id"
+            "default": null
           },
           "revision": {
             "anyOf": [
@@ -138,26 +123,22 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "title": "Revision"
+            "default": null
           },
           "changed": {
             "items": {
               "type": "string"
             },
-            "title": "Changed",
             "type": "array"
           },
           "warnings": {
             "items": {
               "type": "string"
             },
-            "title": "Warnings",
             "type": "array"
           },
           "data": {
             "additionalProperties": true,
-            "title": "Data",
             "type": "object"
           },
           "error": {
@@ -170,16 +151,15 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "title": "Error"
+            "default": null
           }
         },
         "required": [
           "ok",
           "summary"
         ],
-        "title": "Result",
-        "type": "object"
+        "type": "object",
+        "additionalProperties": false
       },
       "annotations": {
         "readOnlyHint": false,
@@ -192,29 +172,24 @@
       "name": "project_open",
       "description": "Reopen a server-created project by ID; verifies committed sources and returns its revision.",
       "inputSchema": {
-        "additionalProperties": false,
         "properties": {
           "project_id": {
             "pattern": "^[a-f0-9]{32}$",
-            "title": "Project Id",
             "type": "string"
           }
         },
         "required": [
           "project_id"
         ],
-        "title": "ProjectRef",
-        "type": "object"
+        "type": "object",
+        "additionalProperties": false
       },
       "outputSchema": {
-        "additionalProperties": false,
         "properties": {
           "ok": {
-            "title": "Ok",
             "type": "boolean"
           },
           "summary": {
-            "title": "Summary",
             "type": "string"
           },
           "project_id": {
@@ -226,8 +201,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "title": "Project Id"
+            "default": null
           },
           "revision": {
             "anyOf": [
@@ -238,26 +212,22 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "title": "Revision"
+            "default": null
           },
           "changed": {
             "items": {
               "type": "string"
             },
-            "title": "Changed",
             "type": "array"
           },
           "warnings": {
             "items": {
               "type": "string"
             },
-            "title": "Warnings",
             "type": "array"
           },
           "data": {
             "additionalProperties": true,
-            "title": "Data",
             "type": "object"
           },
           "error": {
@@ -270,16 +240,15 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "title": "Error"
+            "default": null
           }
         },
         "required": [
           "ok",
           "summary"
         ],
-        "title": "Result",
-        "type": "object"
+        "type": "object",
+        "additionalProperties": false
       },
       "annotations": {
         "readOnlyHint": true,
@@ -290,13 +259,11 @@
     },
     {
       "name": "project_inspect",
-      "description": "Inspect a specified revision, metadata, metrics, kerning and a paginated glyph inventory.",
+      "description": "Inspect revision metrics and glyph count. Use detail=full for metadata, kerning and paginated glyph inventory.",
       "inputSchema": {
-        "additionalProperties": false,
         "properties": {
           "project_id": {
             "pattern": "^[a-f0-9]{32}$",
-            "title": "Project Id",
             "type": "string"
           },
           "revision": {
@@ -309,39 +276,45 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "title": "Revision"
+            "default": null
+          },
+          "detail": {
+            "default": "summary",
+            "enum": [
+              "summary",
+              "full"
+            ],
+            "type": "string"
+          },
+          "include_total": {
+            "default": false,
+            "type": "boolean"
           },
           "offset": {
             "default": 0,
             "maximum": 100000,
             "minimum": 0,
-            "title": "Offset",
             "type": "integer"
           },
           "limit": {
             "default": 50,
             "maximum": 100,
             "minimum": 1,
-            "title": "Limit",
             "type": "integer"
           }
         },
         "required": [
           "project_id"
         ],
-        "title": "Page",
-        "type": "object"
+        "type": "object",
+        "additionalProperties": false
       },
       "outputSchema": {
-        "additionalProperties": false,
         "properties": {
           "ok": {
-            "title": "Ok",
             "type": "boolean"
           },
           "summary": {
-            "title": "Summary",
             "type": "string"
           },
           "project_id": {
@@ -353,8 +326,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "title": "Project Id"
+            "default": null
           },
           "revision": {
             "anyOf": [
@@ -365,26 +337,22 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "title": "Revision"
+            "default": null
           },
           "changed": {
             "items": {
               "type": "string"
             },
-            "title": "Changed",
             "type": "array"
           },
           "warnings": {
             "items": {
               "type": "string"
             },
-            "title": "Warnings",
             "type": "array"
           },
           "data": {
             "additionalProperties": true,
-            "title": "Data",
             "type": "object"
           },
           "error": {
@@ -397,16 +365,15 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "title": "Error"
+            "default": null
           }
         },
         "required": [
           "ok",
           "summary"
         ],
-        "title": "Result",
-        "type": "object"
+        "type": "object",
+        "additionalProperties": false
       },
       "annotations": {
         "readOnlyHint": true,
@@ -419,140 +386,18 @@
       "name": "project_update",
       "description": "Atomically update metadata, brief or decision journal. Requires expected_revision. UPM changes on nonempty fonts fail.",
       "inputSchema": {
-        "$defs": {
-          "Decision": {
-            "additionalProperties": false,
-            "properties": {
-              "hypothesis": {
-                "maxLength": 4000,
-                "title": "Hypothesis",
-                "type": "string"
-              },
-              "variant": {
-                "default": "",
-                "maxLength": 4000,
-                "title": "Variant",
-                "type": "string"
-              },
-              "observation": {
-                "default": "",
-                "maxLength": 4000,
-                "title": "Observation",
-                "type": "string"
-              },
-              "review": {
-                "default": "unreviewed",
-                "enum": [
-                  "unreviewed",
-                  "automatic",
-                  "agent"
-                ],
-                "title": "Review",
-                "type": "string"
-              }
-            },
-            "required": [
-              "hypothesis"
-            ],
-            "title": "Decision",
-            "type": "object"
-          },
-          "Metadata": {
-            "additionalProperties": false,
-            "properties": {
-              "family": {
-                "maxLength": 100,
-                "minLength": 1,
-                "pattern": "^[^\\x00-\\x1f]+$",
-                "title": "Family",
-                "type": "string"
-              },
-              "style": {
-                "default": "Regular",
-                "maxLength": 100,
-                "minLength": 1,
-                "pattern": "^[^\\x00-\\x1f]+$",
-                "title": "Style",
-                "type": "string"
-              },
-              "copyright": {
-                "default": "",
-                "maxLength": 1000,
-                "title": "Copyright",
-                "type": "string"
-              },
-              "license_text": {
-                "default": "",
-                "maxLength": 4000,
-                "title": "License Text",
-                "type": "string"
-              }
-            },
-            "required": [
-              "family"
-            ],
-            "title": "Metadata",
-            "type": "object"
-          },
-          "Metrics": {
-            "additionalProperties": false,
-            "properties": {
-              "units_per_em": {
-                "default": 1000,
-                "maximum": 4096,
-                "minimum": 16,
-                "title": "Units Per Em",
-                "type": "integer"
-              },
-              "ascender": {
-                "default": 800,
-                "maximum": 16000,
-                "minimum": -16000,
-                "title": "Ascender",
-                "type": "number"
-              },
-              "descender": {
-                "default": -200,
-                "maximum": 16000,
-                "minimum": -16000,
-                "title": "Descender",
-                "type": "number"
-              },
-              "cap_height": {
-                "default": 700,
-                "maximum": 16000,
-                "minimum": -16000,
-                "title": "Cap Height",
-                "type": "number"
-              },
-              "x_height": {
-                "default": 500,
-                "maximum": 16000,
-                "minimum": -16000,
-                "title": "X Height",
-                "type": "number"
-              }
-            },
-            "title": "Metrics",
-            "type": "object"
-          }
-        },
-        "additionalProperties": false,
         "properties": {
           "project_id": {
             "pattern": "^[a-f0-9]{32}$",
-            "title": "Project Id",
             "type": "string"
           },
           "expected_revision": {
             "pattern": "^[a-f0-9]{32}$",
-            "title": "Expected Revision",
             "type": "string"
           },
           "summary": {
             "default": "",
             "maxLength": 500,
-            "title": "Summary",
             "type": "string"
           },
           "metadata": {
@@ -587,8 +432,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "title": "Brief"
+            "default": null
           },
           "decision": {
             "anyOf": [
@@ -606,18 +450,117 @@
           "project_id",
           "expected_revision"
         ],
-        "title": "ProjectUpdate",
-        "type": "object"
+        "type": "object",
+        "$defs": {
+          "Decision": {
+            "additionalProperties": false,
+            "properties": {
+              "hypothesis": {
+                "maxLength": 4000,
+                "type": "string"
+              },
+              "variant": {
+                "default": "",
+                "maxLength": 4000,
+                "type": "string"
+              },
+              "observation": {
+                "default": "",
+                "maxLength": 4000,
+                "type": "string"
+              },
+              "review": {
+                "default": "unreviewed",
+                "enum": [
+                  "unreviewed",
+                  "automatic",
+                  "agent"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "hypothesis"
+            ],
+            "type": "object"
+          },
+          "Metadata": {
+            "additionalProperties": false,
+            "properties": {
+              "family": {
+                "maxLength": 100,
+                "minLength": 1,
+                "pattern": "^[^\\x00-\\x1f]+$",
+                "type": "string"
+              },
+              "style": {
+                "default": "Regular",
+                "maxLength": 100,
+                "minLength": 1,
+                "pattern": "^[^\\x00-\\x1f]+$",
+                "type": "string"
+              },
+              "copyright": {
+                "default": "",
+                "maxLength": 1000,
+                "type": "string"
+              },
+              "license_text": {
+                "default": "",
+                "maxLength": 4000,
+                "type": "string"
+              }
+            },
+            "required": [
+              "family"
+            ],
+            "type": "object"
+          },
+          "Metrics": {
+            "additionalProperties": false,
+            "properties": {
+              "units_per_em": {
+                "default": 1000,
+                "maximum": 4096,
+                "minimum": 16,
+                "type": "integer"
+              },
+              "ascender": {
+                "default": 800,
+                "maximum": 16000,
+                "minimum": -16000,
+                "type": "number"
+              },
+              "descender": {
+                "default": -200,
+                "maximum": 16000,
+                "minimum": -16000,
+                "type": "number"
+              },
+              "cap_height": {
+                "default": 700,
+                "maximum": 16000,
+                "minimum": -16000,
+                "type": "number"
+              },
+              "x_height": {
+                "default": 500,
+                "maximum": 16000,
+                "minimum": -16000,
+                "type": "number"
+              }
+            },
+            "type": "object"
+          }
+        },
+        "additionalProperties": false
       },
       "outputSchema": {
-        "additionalProperties": false,
         "properties": {
           "ok": {
-            "title": "Ok",
             "type": "boolean"
           },
           "summary": {
-            "title": "Summary",
             "type": "string"
           },
           "project_id": {
@@ -629,8 +572,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "title": "Project Id"
+            "default": null
           },
           "revision": {
             "anyOf": [
@@ -641,26 +583,22 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "title": "Revision"
+            "default": null
           },
           "changed": {
             "items": {
               "type": "string"
             },
-            "title": "Changed",
             "type": "array"
           },
           "warnings": {
             "items": {
               "type": "string"
             },
-            "title": "Warnings",
             "type": "array"
           },
           "data": {
             "additionalProperties": true,
-            "title": "Data",
             "type": "object"
           },
           "error": {
@@ -673,16 +611,15 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "title": "Error"
+            "default": null
           }
         },
         "required": [
           "ok",
           "summary"
         ],
-        "title": "Result",
-        "type": "object"
+        "type": "object",
+        "additionalProperties": false
       },
       "annotations": {
         "readOnlyHint": false,
@@ -693,13 +630,11 @@
     },
     {
       "name": "glyph_get",
-      "description": "Read stable contour/point/component/anchor IDs and advance, bounds and bearings in font units, Y upwards.",
+      "description": "Read glyph metrics in font units, Y upwards. Use detail=full for contour/point/component/anchor IDs and geometry.",
       "inputSchema": {
-        "additionalProperties": false,
         "properties": {
           "project_id": {
             "pattern": "^[a-f0-9]{32}$",
-            "title": "Project Id",
             "type": "string"
           },
           "revision": {
@@ -712,12 +647,18 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "title": "Revision"
+            "default": null
           },
           "glyph_id": {
             "pattern": "^(?:\\.notdef|[a-zA-Z_][a-zA-Z0-9_.]{0,62})$",
-            "title": "Glyph Id",
+            "type": "string"
+          },
+          "detail": {
+            "default": "summary",
+            "enum": [
+              "summary",
+              "full"
+            ],
             "type": "string"
           }
         },
@@ -725,18 +666,15 @@
           "project_id",
           "glyph_id"
         ],
-        "title": "GlyphGet",
-        "type": "object"
+        "type": "object",
+        "additionalProperties": false
       },
       "outputSchema": {
-        "additionalProperties": false,
         "properties": {
           "ok": {
-            "title": "Ok",
             "type": "boolean"
           },
           "summary": {
-            "title": "Summary",
             "type": "string"
           },
           "project_id": {
@@ -748,8 +686,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "title": "Project Id"
+            "default": null
           },
           "revision": {
             "anyOf": [
@@ -760,26 +697,22 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "title": "Revision"
+            "default": null
           },
           "changed": {
             "items": {
               "type": "string"
             },
-            "title": "Changed",
             "type": "array"
           },
           "warnings": {
             "items": {
               "type": "string"
             },
-            "title": "Warnings",
             "type": "array"
           },
           "data": {
             "additionalProperties": true,
-            "title": "Data",
             "type": "object"
           },
           "error": {
@@ -792,16 +725,15 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "title": "Error"
+            "default": null
           }
         },
         "required": [
           "ok",
           "summary"
         ],
-        "title": "Result",
-        "type": "object"
+        "type": "object",
+        "additionalProperties": false
       },
       "annotations": {
         "readOnlyHint": true,
@@ -812,32 +744,132 @@
     },
     {
       "name": "glyph_edit",
-      "description": "Apply an atomic typed vector batch to a named glyph. Offcurve points are handles. Replacements must be explicit; removed IDs are returned.",
+      "description": "Apply typed vector operations or bounded numeric drawing primitives atomically to one glyph. Use detail=full for added/removed/touched IDs. Replacements are explicit.",
       "inputSchema": {
+        "properties": {
+          "glyph_id": {
+            "pattern": "^(?:\\.notdef|[a-zA-Z_][a-zA-Z0-9_.]{0,62})$",
+            "type": "string"
+          },
+          "create": {
+            "default": false,
+            "type": "boolean"
+          },
+          "operations": {
+            "items": {
+              "discriminator": {
+                "mapping": {
+                  "compose_accent": "#/$defs/ComposeAccent",
+                  "duplicate": "#/$defs/Duplicate",
+                  "filled_path": "#/$defs/FilledPath",
+                  "move_point": "#/$defs/MovePoint",
+                  "primitive": "#/$defs/Primitive",
+                  "put_anchor": "#/$defs/PutAnchor",
+                  "put_component": "#/$defs/PutComponent",
+                  "put_contour": "#/$defs/PutContour",
+                  "remove": "#/$defs/Remove",
+                  "replace_glyph": "#/$defs/ReplaceGlyph",
+                  "set_unicodes": "#/$defs/SetUnicodes",
+                  "stroke_path": "#/$defs/StrokePath",
+                  "transform": "#/$defs/Transform"
+                },
+                "propertyName": "op"
+              },
+              "oneOf": [
+                {
+                  "$ref": "#/$defs/PutContour"
+                },
+                {
+                  "$ref": "#/$defs/MovePoint"
+                },
+                {
+                  "$ref": "#/$defs/Transform"
+                },
+                {
+                  "$ref": "#/$defs/PutComponent"
+                },
+                {
+                  "$ref": "#/$defs/PutAnchor"
+                },
+                {
+                  "$ref": "#/$defs/Remove"
+                },
+                {
+                  "$ref": "#/$defs/SetUnicodes"
+                },
+                {
+                  "$ref": "#/$defs/ReplaceGlyph"
+                },
+                {
+                  "$ref": "#/$defs/FilledPath"
+                },
+                {
+                  "$ref": "#/$defs/StrokePath"
+                },
+                {
+                  "$ref": "#/$defs/Primitive"
+                },
+                {
+                  "$ref": "#/$defs/Duplicate"
+                },
+                {
+                  "$ref": "#/$defs/ComposeAccent"
+                }
+              ]
+            },
+            "maxItems": 128,
+            "minItems": 1,
+            "type": "array"
+          },
+          "project_id": {
+            "pattern": "^[a-f0-9]{32}$",
+            "type": "string"
+          },
+          "expected_revision": {
+            "pattern": "^[a-f0-9]{32}$",
+            "type": "string"
+          },
+          "summary": {
+            "default": "",
+            "maxLength": 500,
+            "type": "string"
+          },
+          "detail": {
+            "default": "summary",
+            "enum": [
+              "summary",
+              "full"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "glyph_id",
+          "operations",
+          "project_id",
+          "expected_revision"
+        ],
+        "type": "object",
         "$defs": {
           "Anchor": {
             "additionalProperties": false,
             "properties": {
               "id": {
                 "pattern": "^[a-zA-Z0-9_][a-zA-Z0-9_.-]{0,63}$",
-                "title": "Id",
                 "type": "string"
               },
               "name": {
                 "pattern": "^[a-zA-Z0-9_][a-zA-Z0-9_.-]{0,63}$",
-                "title": "Name",
                 "type": "string"
               },
               "x": {
                 "maximum": 16000,
                 "minimum": -16000,
-                "title": "X",
                 "type": "number"
               },
               "y": {
                 "maximum": 16000,
                 "minimum": -16000,
-                "title": "Y",
                 "type": "number"
               }
             },
@@ -847,7 +879,6 @@
               "x",
               "y"
             ],
-            "title": "Anchor",
             "type": "object"
           },
           "Component": {
@@ -855,12 +886,10 @@
             "properties": {
               "id": {
                 "pattern": "^[a-zA-Z0-9_][a-zA-Z0-9_.-]{0,63}$",
-                "title": "Id",
                 "type": "string"
               },
               "base": {
                 "pattern": "^(?:\\.notdef|[a-zA-Z_][a-zA-Z0-9_.]{0,62})$",
-                "title": "Base",
                 "type": "string"
               },
               "transform": {
@@ -906,7 +935,6 @@
                     "type": "number"
                   }
                 ],
-                "title": "Transform",
                 "type": "array"
               }
             },
@@ -914,7 +942,39 @@
               "id",
               "base"
             ],
-            "title": "Component",
+            "type": "object"
+          },
+          "ComposeAccent": {
+            "additionalProperties": false,
+            "properties": {
+              "op": {
+                "const": "compose_accent",
+                "type": "string"
+              },
+              "base": {
+                "pattern": "^(?:\\.notdef|[a-zA-Z_][a-zA-Z0-9_.]{0,62})$",
+                "type": "string"
+              },
+              "mark": {
+                "pattern": "^(?:\\.notdef|[a-zA-Z_][a-zA-Z0-9_.]{0,62})$",
+                "type": "string"
+              },
+              "base_anchor": {
+                "default": "top",
+                "pattern": "^[a-zA-Z0-9_][a-zA-Z0-9_.-]{0,63}$",
+                "type": "string"
+              },
+              "mark_anchor": {
+                "default": "_top",
+                "pattern": "^[a-zA-Z0-9_][a-zA-Z0-9_.-]{0,63}$",
+                "type": "string"
+              }
+            },
+            "required": [
+              "op",
+              "base",
+              "mark"
+            ],
             "type": "object"
           },
           "Contour": {
@@ -922,7 +982,6 @@
             "properties": {
               "id": {
                 "pattern": "^[a-zA-Z0-9_][a-zA-Z0-9_.-]{0,63}$",
-                "title": "Id",
                 "type": "string"
               },
               "points": {
@@ -931,7 +990,6 @@
                 },
                 "maxItems": 2048,
                 "minItems": 2,
-                "title": "Points",
                 "type": "array"
               }
             },
@@ -939,7 +997,115 @@
               "id",
               "points"
             ],
-            "title": "Contour",
+            "type": "object"
+          },
+          "Duplicate": {
+            "additionalProperties": false,
+            "properties": {
+              "op": {
+                "const": "duplicate",
+                "type": "string"
+              },
+              "source": {
+                "pattern": "^(?:\\.notdef|[a-zA-Z_][a-zA-Z0-9_.]{0,62})$",
+                "type": "string"
+              },
+              "matrix": {
+                "default": [
+                  1,
+                  0,
+                  0,
+                  1,
+                  0,
+                  0
+                ],
+                "maxItems": 6,
+                "minItems": 6,
+                "prefixItems": [
+                  {
+                    "maximum": 16,
+                    "minimum": -16,
+                    "type": "number"
+                  },
+                  {
+                    "maximum": 16,
+                    "minimum": -16,
+                    "type": "number"
+                  },
+                  {
+                    "maximum": 16,
+                    "minimum": -16,
+                    "type": "number"
+                  },
+                  {
+                    "maximum": 16,
+                    "minimum": -16,
+                    "type": "number"
+                  },
+                  {
+                    "maximum": 16000,
+                    "minimum": -16000,
+                    "type": "number"
+                  },
+                  {
+                    "maximum": 16000,
+                    "minimum": -16000,
+                    "type": "number"
+                  }
+                ],
+                "type": "array"
+              }
+            },
+            "required": [
+              "op",
+              "source"
+            ],
+            "type": "object"
+          },
+          "FilledPath": {
+            "additionalProperties": false,
+            "properties": {
+              "op": {
+                "const": "filled_path",
+                "type": "string"
+              },
+              "paths": {
+                "items": {
+                  "maxLength": 16000,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "maxItems": 32,
+                "minItems": 1,
+                "type": "array"
+              },
+              "id": {
+                "default": "outline",
+                "pattern": "^[a-zA-Z_][a-zA-Z0-9_]{0,23}$",
+                "type": "string"
+              },
+              "replace": {
+                "default": false,
+                "type": "boolean"
+              },
+              "advance": {
+                "anyOf": [
+                  {
+                    "maximum": 16000,
+                    "minimum": 0,
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              }
+            },
+            "required": [
+              "op",
+              "paths"
+            ],
             "type": "object"
           },
           "Glyph": {
@@ -949,7 +1115,6 @@
                 "default": 600,
                 "maximum": 16000,
                 "minimum": 0,
-                "title": "Advance",
                 "type": "number"
               },
               "unicodes": {
@@ -959,7 +1124,6 @@
                   "type": "integer"
                 },
                 "maxItems": 32,
-                "title": "Unicodes",
                 "type": "array"
               },
               "contours": {
@@ -967,7 +1131,6 @@
                   "$ref": "#/$defs/Contour"
                 },
                 "maxItems": 64,
-                "title": "Contours",
                 "type": "array"
               },
               "components": {
@@ -975,7 +1138,6 @@
                   "$ref": "#/$defs/Component"
                 },
                 "maxItems": 32,
-                "title": "Components",
                 "type": "array"
               },
               "anchors": {
@@ -983,11 +1145,9 @@
                   "$ref": "#/$defs/Anchor"
                 },
                 "maxItems": 32,
-                "title": "Anchors",
                 "type": "array"
               }
             },
-            "title": "Glyph",
             "type": "object"
           },
           "MovePoint": {
@@ -995,24 +1155,20 @@
             "properties": {
               "op": {
                 "const": "move_point",
-                "title": "Op",
                 "type": "string"
               },
               "point_id": {
                 "pattern": "^[a-zA-Z0-9_][a-zA-Z0-9_.-]{0,63}$",
-                "title": "Point Id",
                 "type": "string"
               },
               "x": {
                 "maximum": 16000,
                 "minimum": -16000,
-                "title": "X",
                 "type": "number"
               },
               "y": {
                 "maximum": 16000,
                 "minimum": -16000,
-                "title": "Y",
                 "type": "number"
               }
             },
@@ -1022,7 +1178,6 @@
               "x",
               "y"
             ],
-            "title": "MovePoint",
             "type": "object"
           },
           "Point": {
@@ -1030,19 +1185,16 @@
             "properties": {
               "id": {
                 "pattern": "^[a-zA-Z0-9_][a-zA-Z0-9_.-]{0,63}$",
-                "title": "Id",
                 "type": "string"
               },
               "x": {
                 "maximum": 16000,
                 "minimum": -16000,
-                "title": "X",
                 "type": "number"
               },
               "y": {
                 "maximum": 16000,
                 "minimum": -16000,
-                "title": "Y",
                 "type": "number"
               },
               "type": {
@@ -1053,12 +1205,10 @@
                   "qcurve",
                   "offcurve"
                 ],
-                "title": "Type",
                 "type": "string"
               },
               "smooth": {
                 "default": false,
-                "title": "Smooth",
                 "type": "boolean"
               }
             },
@@ -1067,7 +1217,73 @@
               "x",
               "y"
             ],
-            "title": "Point",
+            "type": "object"
+          },
+          "Primitive": {
+            "additionalProperties": false,
+            "properties": {
+              "op": {
+                "const": "primitive",
+                "type": "string"
+              },
+              "shape": {
+                "enum": [
+                  "rectangle",
+                  "ellipse"
+                ],
+                "type": "string"
+              },
+              "x": {
+                "maximum": 16000,
+                "minimum": -16000,
+                "type": "number"
+              },
+              "y": {
+                "maximum": 16000,
+                "minimum": -16000,
+                "type": "number"
+              },
+              "width": {
+                "exclusiveMinimum": 0,
+                "maximum": 16000,
+                "type": "number"
+              },
+              "height": {
+                "exclusiveMinimum": 0,
+                "maximum": 16000,
+                "type": "number"
+              },
+              "id": {
+                "default": "outline",
+                "pattern": "^[a-zA-Z_][a-zA-Z0-9_]{0,23}$",
+                "type": "string"
+              },
+              "replace": {
+                "default": false,
+                "type": "boolean"
+              },
+              "advance": {
+                "anyOf": [
+                  {
+                    "maximum": 16000,
+                    "minimum": 0,
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              }
+            },
+            "required": [
+              "op",
+              "shape",
+              "x",
+              "y",
+              "width",
+              "height"
+            ],
             "type": "object"
           },
           "PutAnchor": {
@@ -1075,7 +1291,6 @@
             "properties": {
               "op": {
                 "const": "put_anchor",
-                "title": "Op",
                 "type": "string"
               },
               "anchor": {
@@ -1083,7 +1298,6 @@
               },
               "replace": {
                 "default": false,
-                "title": "Replace",
                 "type": "boolean"
               }
             },
@@ -1091,7 +1305,6 @@
               "op",
               "anchor"
             ],
-            "title": "PutAnchor",
             "type": "object"
           },
           "PutComponent": {
@@ -1099,7 +1312,6 @@
             "properties": {
               "op": {
                 "const": "put_component",
-                "title": "Op",
                 "type": "string"
               },
               "component": {
@@ -1107,7 +1319,6 @@
               },
               "replace": {
                 "default": false,
-                "title": "Replace",
                 "type": "boolean"
               }
             },
@@ -1115,7 +1326,6 @@
               "op",
               "component"
             ],
-            "title": "PutComponent",
             "type": "object"
           },
           "PutContour": {
@@ -1123,7 +1333,6 @@
             "properties": {
               "op": {
                 "const": "put_contour",
-                "title": "Op",
                 "type": "string"
               },
               "contour": {
@@ -1131,7 +1340,6 @@
               },
               "replace": {
                 "default": false,
-                "title": "Replace",
                 "type": "boolean"
               }
             },
@@ -1139,7 +1347,6 @@
               "op",
               "contour"
             ],
-            "title": "PutContour",
             "type": "object"
           },
           "Remove": {
@@ -1147,7 +1354,6 @@
             "properties": {
               "op": {
                 "const": "remove",
-                "title": "Op",
                 "type": "string"
               },
               "kind": {
@@ -1156,12 +1362,10 @@
                   "component",
                   "anchor"
                 ],
-                "title": "Kind",
                 "type": "string"
               },
               "id": {
                 "pattern": "^[a-zA-Z0-9_][a-zA-Z0-9_.-]{0,63}$",
-                "title": "Id",
                 "type": "string"
               }
             },
@@ -1170,7 +1374,6 @@
               "kind",
               "id"
             ],
-            "title": "Remove",
             "type": "object"
           },
           "ReplaceGlyph": {
@@ -1178,7 +1381,6 @@
             "properties": {
               "op": {
                 "const": "replace_glyph",
-                "title": "Op",
                 "type": "string"
               },
               "glyph": {
@@ -1189,7 +1391,6 @@
               "op",
               "glyph"
             ],
-            "title": "ReplaceGlyph",
             "type": "object"
           },
           "SetUnicodes": {
@@ -1197,7 +1398,6 @@
             "properties": {
               "op": {
                 "const": "set_unicodes",
-                "title": "Op",
                 "type": "string"
               },
               "unicodes": {
@@ -1207,7 +1407,6 @@
                   "type": "integer"
                 },
                 "maxItems": 32,
-                "title": "Unicodes",
                 "type": "array"
               }
             },
@@ -1215,7 +1414,76 @@
               "op",
               "unicodes"
             ],
-            "title": "SetUnicodes",
+            "type": "object"
+          },
+          "StrokePath": {
+            "additionalProperties": false,
+            "properties": {
+              "op": {
+                "const": "stroke_path",
+                "type": "string"
+              },
+              "paths": {
+                "items": {
+                  "maxLength": 16000,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "maxItems": 32,
+                "minItems": 1,
+                "type": "array"
+              },
+              "id": {
+                "default": "outline",
+                "pattern": "^[a-zA-Z_][a-zA-Z0-9_]{0,23}$",
+                "type": "string"
+              },
+              "replace": {
+                "default": false,
+                "type": "boolean"
+              },
+              "advance": {
+                "anyOf": [
+                  {
+                    "maximum": 16000,
+                    "minimum": 0,
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              },
+              "width": {
+                "exclusiveMinimum": 0,
+                "maximum": 2000,
+                "type": "number"
+              },
+              "cap": {
+                "default": "round",
+                "enum": [
+                  "round",
+                  "butt",
+                  "square"
+                ],
+                "type": "string"
+              },
+              "join": {
+                "default": "round",
+                "enum": [
+                  "round",
+                  "bevel",
+                  "miter"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "op",
+              "paths",
+              "width"
+            ],
             "type": "object"
           },
           "Transform": {
@@ -1223,7 +1491,6 @@
             "properties": {
               "op": {
                 "const": "transform",
-                "title": "Op",
                 "type": "string"
               },
               "matrix": {
@@ -1261,7 +1528,6 @@
                     "type": "number"
                   }
                 ],
-                "title": "Matrix",
                 "type": "array"
               },
               "contour_ids": {
@@ -1278,112 +1544,24 @@
                     "type": "null"
                   }
                 ],
-                "default": null,
-                "title": "Contour Ids"
+                "default": null
               }
             },
             "required": [
               "op",
               "matrix"
             ],
-            "title": "Transform",
             "type": "object"
           }
         },
-        "additionalProperties": false,
-        "properties": {
-          "project_id": {
-            "pattern": "^[a-f0-9]{32}$",
-            "title": "Project Id",
-            "type": "string"
-          },
-          "expected_revision": {
-            "pattern": "^[a-f0-9]{32}$",
-            "title": "Expected Revision",
-            "type": "string"
-          },
-          "summary": {
-            "default": "",
-            "maxLength": 500,
-            "title": "Summary",
-            "type": "string"
-          },
-          "glyph_id": {
-            "pattern": "^(?:\\.notdef|[a-zA-Z_][a-zA-Z0-9_.]{0,62})$",
-            "title": "Glyph Id",
-            "type": "string"
-          },
-          "create": {
-            "default": false,
-            "title": "Create",
-            "type": "boolean"
-          },
-          "operations": {
-            "items": {
-              "discriminator": {
-                "mapping": {
-                  "move_point": "#/$defs/MovePoint",
-                  "put_anchor": "#/$defs/PutAnchor",
-                  "put_component": "#/$defs/PutComponent",
-                  "put_contour": "#/$defs/PutContour",
-                  "remove": "#/$defs/Remove",
-                  "replace_glyph": "#/$defs/ReplaceGlyph",
-                  "set_unicodes": "#/$defs/SetUnicodes",
-                  "transform": "#/$defs/Transform"
-                },
-                "propertyName": "op"
-              },
-              "oneOf": [
-                {
-                  "$ref": "#/$defs/PutContour"
-                },
-                {
-                  "$ref": "#/$defs/MovePoint"
-                },
-                {
-                  "$ref": "#/$defs/Transform"
-                },
-                {
-                  "$ref": "#/$defs/PutComponent"
-                },
-                {
-                  "$ref": "#/$defs/PutAnchor"
-                },
-                {
-                  "$ref": "#/$defs/Remove"
-                },
-                {
-                  "$ref": "#/$defs/SetUnicodes"
-                },
-                {
-                  "$ref": "#/$defs/ReplaceGlyph"
-                }
-              ]
-            },
-            "maxItems": 128,
-            "minItems": 1,
-            "title": "Operations",
-            "type": "array"
-          }
-        },
-        "required": [
-          "project_id",
-          "expected_revision",
-          "glyph_id",
-          "operations"
-        ],
-        "title": "GlyphEdit",
-        "type": "object"
+        "additionalProperties": false
       },
       "outputSchema": {
-        "additionalProperties": false,
         "properties": {
           "ok": {
-            "title": "Ok",
             "type": "boolean"
           },
           "summary": {
-            "title": "Summary",
             "type": "string"
           },
           "project_id": {
@@ -1395,8 +1573,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "title": "Project Id"
+            "default": null
           },
           "revision": {
             "anyOf": [
@@ -1407,26 +1584,22 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "title": "Revision"
+            "default": null
           },
           "changed": {
             "items": {
               "type": "string"
             },
-            "title": "Changed",
             "type": "array"
           },
           "warnings": {
             "items": {
               "type": "string"
             },
-            "title": "Warnings",
             "type": "array"
           },
           "data": {
             "additionalProperties": true,
-            "title": "Data",
             "type": "object"
           },
           "error": {
@@ -1439,16 +1612,15 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "title": "Error"
+            "default": null
           }
         },
         "required": [
           "ok",
           "summary"
         ],
-        "title": "Result",
-        "type": "object"
+        "type": "object",
+        "additionalProperties": false
       },
       "annotations": {
         "readOnlyHint": false,
@@ -1461,166 +1633,18 @@
       "name": "spacing_edit",
       "description": "Atomically set advances, both side bearings, kerning groups or pairs. Bearings move outlines; advances do not.",
       "inputSchema": {
-        "$defs": {
-          "Bearings": {
-            "additionalProperties": false,
-            "properties": {
-              "op": {
-                "const": "bearings",
-                "title": "Op",
-                "type": "string"
-              },
-              "glyph_id": {
-                "pattern": "^(?:\\.notdef|[a-zA-Z_][a-zA-Z0-9_.]{0,62})$",
-                "title": "Glyph Id",
-                "type": "string"
-              },
-              "left": {
-                "maximum": 16000,
-                "minimum": -16000,
-                "title": "Left",
-                "type": "number"
-              },
-              "right": {
-                "maximum": 16000,
-                "minimum": -16000,
-                "title": "Right",
-                "type": "number"
-              }
-            },
-            "required": [
-              "op",
-              "glyph_id",
-              "left",
-              "right"
-            ],
-            "title": "Bearings",
-            "type": "object"
-          },
-          "KernGroup": {
-            "additionalProperties": false,
-            "properties": {
-              "op": {
-                "const": "kern_group",
-                "title": "Op",
-                "type": "string"
-              },
-              "name": {
-                "pattern": "^public\\.kern[12]\\.[a-zA-Z0-9_]{1,40}$",
-                "title": "Name",
-                "type": "string"
-              },
-              "glyphs": {
-                "anyOf": [
-                  {
-                    "items": {
-                      "pattern": "^(?:\\.notdef|[a-zA-Z_][a-zA-Z0-9_.]{0,62})$",
-                      "type": "string"
-                    },
-                    "maxItems": 512,
-                    "type": "array"
-                  },
-                  {
-                    "type": "null"
-                  }
-                ],
-                "title": "Glyphs"
-              }
-            },
-            "required": [
-              "op",
-              "name",
-              "glyphs"
-            ],
-            "title": "KernGroup",
-            "type": "object"
-          },
-          "KernPair": {
-            "additionalProperties": false,
-            "properties": {
-              "op": {
-                "const": "kern_pair",
-                "title": "Op",
-                "type": "string"
-              },
-              "left": {
-                "pattern": "^(?:\\.notdef|[a-zA-Z_][a-zA-Z0-9_.]{0,62})$",
-                "title": "Left",
-                "type": "string"
-              },
-              "right": {
-                "pattern": "^(?:\\.notdef|[a-zA-Z_][a-zA-Z0-9_.]{0,62})$",
-                "title": "Right",
-                "type": "string"
-              },
-              "value": {
-                "anyOf": [
-                  {
-                    "maximum": 16000,
-                    "minimum": -16000,
-                    "type": "number"
-                  },
-                  {
-                    "type": "null"
-                  }
-                ],
-                "title": "Value"
-              }
-            },
-            "required": [
-              "op",
-              "left",
-              "right",
-              "value"
-            ],
-            "title": "KernPair",
-            "type": "object"
-          },
-          "SetAdvance": {
-            "additionalProperties": false,
-            "properties": {
-              "op": {
-                "const": "advance",
-                "title": "Op",
-                "type": "string"
-              },
-              "glyph_id": {
-                "pattern": "^(?:\\.notdef|[a-zA-Z_][a-zA-Z0-9_.]{0,62})$",
-                "title": "Glyph Id",
-                "type": "string"
-              },
-              "value": {
-                "maximum": 16000,
-                "minimum": 0,
-                "title": "Value",
-                "type": "number"
-              }
-            },
-            "required": [
-              "op",
-              "glyph_id",
-              "value"
-            ],
-            "title": "SetAdvance",
-            "type": "object"
-          }
-        },
-        "additionalProperties": false,
         "properties": {
           "project_id": {
             "pattern": "^[a-f0-9]{32}$",
-            "title": "Project Id",
             "type": "string"
           },
           "expected_revision": {
             "pattern": "^[a-f0-9]{32}$",
-            "title": "Expected Revision",
             "type": "string"
           },
           "summary": {
             "default": "",
             "maxLength": 500,
-            "title": "Summary",
             "type": "string"
           },
           "operations": {
@@ -1651,7 +1675,6 @@
             },
             "maxItems": 128,
             "minItems": 1,
-            "title": "Operations",
             "type": "array"
           }
         },
@@ -1660,18 +1683,141 @@
           "expected_revision",
           "operations"
         ],
-        "title": "SpacingEdit",
-        "type": "object"
+        "type": "object",
+        "$defs": {
+          "Bearings": {
+            "additionalProperties": false,
+            "properties": {
+              "op": {
+                "const": "bearings",
+                "type": "string"
+              },
+              "glyph_id": {
+                "pattern": "^(?:\\.notdef|[a-zA-Z_][a-zA-Z0-9_.]{0,62})$",
+                "type": "string"
+              },
+              "left": {
+                "maximum": 16000,
+                "minimum": -16000,
+                "type": "number"
+              },
+              "right": {
+                "maximum": 16000,
+                "minimum": -16000,
+                "type": "number"
+              }
+            },
+            "required": [
+              "op",
+              "glyph_id",
+              "left",
+              "right"
+            ],
+            "type": "object"
+          },
+          "KernGroup": {
+            "additionalProperties": false,
+            "properties": {
+              "op": {
+                "const": "kern_group",
+                "type": "string"
+              },
+              "name": {
+                "pattern": "^public\\.kern[12]\\.[a-zA-Z0-9_]{1,40}$",
+                "type": "string"
+              },
+              "glyphs": {
+                "anyOf": [
+                  {
+                    "items": {
+                      "pattern": "^(?:\\.notdef|[a-zA-Z_][a-zA-Z0-9_.]{0,62})$",
+                      "type": "string"
+                    },
+                    "maxItems": 512,
+                    "type": "array"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "op",
+              "name",
+              "glyphs"
+            ],
+            "type": "object"
+          },
+          "KernPair": {
+            "additionalProperties": false,
+            "properties": {
+              "op": {
+                "const": "kern_pair",
+                "type": "string"
+              },
+              "left": {
+                "pattern": "^(?:\\.notdef|[a-zA-Z_][a-zA-Z0-9_.]{0,62})$",
+                "type": "string"
+              },
+              "right": {
+                "pattern": "^(?:\\.notdef|[a-zA-Z_][a-zA-Z0-9_.]{0,62})$",
+                "type": "string"
+              },
+              "value": {
+                "anyOf": [
+                  {
+                    "maximum": 16000,
+                    "minimum": -16000,
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "op",
+              "left",
+              "right",
+              "value"
+            ],
+            "type": "object"
+          },
+          "SetAdvance": {
+            "additionalProperties": false,
+            "properties": {
+              "op": {
+                "const": "advance",
+                "type": "string"
+              },
+              "glyph_id": {
+                "pattern": "^(?:\\.notdef|[a-zA-Z_][a-zA-Z0-9_.]{0,62})$",
+                "type": "string"
+              },
+              "value": {
+                "maximum": 16000,
+                "minimum": 0,
+                "type": "number"
+              }
+            },
+            "required": [
+              "op",
+              "glyph_id",
+              "value"
+            ],
+            "type": "object"
+          }
+        },
+        "additionalProperties": false
       },
       "outputSchema": {
-        "additionalProperties": false,
         "properties": {
           "ok": {
-            "title": "Ok",
             "type": "boolean"
           },
           "summary": {
-            "title": "Summary",
             "type": "string"
           },
           "project_id": {
@@ -1683,8 +1829,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "title": "Project Id"
+            "default": null
           },
           "revision": {
             "anyOf": [
@@ -1695,26 +1840,22 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "title": "Revision"
+            "default": null
           },
           "changed": {
             "items": {
               "type": "string"
             },
-            "title": "Changed",
             "type": "array"
           },
           "warnings": {
             "items": {
               "type": "string"
             },
-            "title": "Warnings",
             "type": "array"
           },
           "data": {
             "additionalProperties": true,
-            "title": "Data",
             "type": "object"
           },
           "error": {
@@ -1727,16 +1868,1072 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "title": "Error"
+            "default": null
           }
         },
         "required": [
           "ok",
           "summary"
         ],
-        "title": "Result",
-        "type": "object"
+        "type": "object",
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": false
+      }
+    },
+    {
+      "name": "font_edit",
+      "description": "Edit up to 128 glyphs atomically, in array order, then apply spacing. Forward component references resolve at final validation; any failure rolls back the entire batch.",
+      "inputSchema": {
+        "properties": {
+          "project_id": {
+            "pattern": "^[a-f0-9]{32}$",
+            "type": "string"
+          },
+          "expected_revision": {
+            "pattern": "^[a-f0-9]{32}$",
+            "type": "string"
+          },
+          "summary": {
+            "default": "",
+            "maxLength": 500,
+            "type": "string"
+          },
+          "glyphs": {
+            "items": {
+              "$ref": "#/$defs/GlyphChange"
+            },
+            "maxItems": 128,
+            "minItems": 1,
+            "type": "array"
+          },
+          "spacing": {
+            "items": {
+              "discriminator": {
+                "mapping": {
+                  "advance": "#/$defs/SetAdvance",
+                  "bearings": "#/$defs/Bearings",
+                  "kern_group": "#/$defs/KernGroup",
+                  "kern_pair": "#/$defs/KernPair"
+                },
+                "propertyName": "op"
+              },
+              "oneOf": [
+                {
+                  "$ref": "#/$defs/SetAdvance"
+                },
+                {
+                  "$ref": "#/$defs/Bearings"
+                },
+                {
+                  "$ref": "#/$defs/KernPair"
+                },
+                {
+                  "$ref": "#/$defs/KernGroup"
+                }
+              ]
+            },
+            "maxItems": 128,
+            "type": "array"
+          },
+          "detail": {
+            "default": "summary",
+            "enum": [
+              "summary",
+              "full"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "project_id",
+          "expected_revision",
+          "glyphs"
+        ],
+        "type": "object",
+        "$defs": {
+          "Anchor": {
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "pattern": "^[a-zA-Z0-9_][a-zA-Z0-9_.-]{0,63}$",
+                "type": "string"
+              },
+              "name": {
+                "pattern": "^[a-zA-Z0-9_][a-zA-Z0-9_.-]{0,63}$",
+                "type": "string"
+              },
+              "x": {
+                "maximum": 16000,
+                "minimum": -16000,
+                "type": "number"
+              },
+              "y": {
+                "maximum": 16000,
+                "minimum": -16000,
+                "type": "number"
+              }
+            },
+            "required": [
+              "id",
+              "name",
+              "x",
+              "y"
+            ],
+            "type": "object"
+          },
+          "Bearings": {
+            "additionalProperties": false,
+            "properties": {
+              "op": {
+                "const": "bearings",
+                "type": "string"
+              },
+              "glyph_id": {
+                "pattern": "^(?:\\.notdef|[a-zA-Z_][a-zA-Z0-9_.]{0,62})$",
+                "type": "string"
+              },
+              "left": {
+                "maximum": 16000,
+                "minimum": -16000,
+                "type": "number"
+              },
+              "right": {
+                "maximum": 16000,
+                "minimum": -16000,
+                "type": "number"
+              }
+            },
+            "required": [
+              "op",
+              "glyph_id",
+              "left",
+              "right"
+            ],
+            "type": "object"
+          },
+          "Component": {
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "pattern": "^[a-zA-Z0-9_][a-zA-Z0-9_.-]{0,63}$",
+                "type": "string"
+              },
+              "base": {
+                "pattern": "^(?:\\.notdef|[a-zA-Z_][a-zA-Z0-9_.]{0,62})$",
+                "type": "string"
+              },
+              "transform": {
+                "default": [
+                  1,
+                  0,
+                  0,
+                  1,
+                  0,
+                  0
+                ],
+                "maxItems": 6,
+                "minItems": 6,
+                "prefixItems": [
+                  {
+                    "maximum": 16,
+                    "minimum": -16,
+                    "type": "number"
+                  },
+                  {
+                    "maximum": 16,
+                    "minimum": -16,
+                    "type": "number"
+                  },
+                  {
+                    "maximum": 16,
+                    "minimum": -16,
+                    "type": "number"
+                  },
+                  {
+                    "maximum": 16,
+                    "minimum": -16,
+                    "type": "number"
+                  },
+                  {
+                    "maximum": 16000,
+                    "minimum": -16000,
+                    "type": "number"
+                  },
+                  {
+                    "maximum": 16000,
+                    "minimum": -16000,
+                    "type": "number"
+                  }
+                ],
+                "type": "array"
+              }
+            },
+            "required": [
+              "id",
+              "base"
+            ],
+            "type": "object"
+          },
+          "ComposeAccent": {
+            "additionalProperties": false,
+            "properties": {
+              "op": {
+                "const": "compose_accent",
+                "type": "string"
+              },
+              "base": {
+                "pattern": "^(?:\\.notdef|[a-zA-Z_][a-zA-Z0-9_.]{0,62})$",
+                "type": "string"
+              },
+              "mark": {
+                "pattern": "^(?:\\.notdef|[a-zA-Z_][a-zA-Z0-9_.]{0,62})$",
+                "type": "string"
+              },
+              "base_anchor": {
+                "default": "top",
+                "pattern": "^[a-zA-Z0-9_][a-zA-Z0-9_.-]{0,63}$",
+                "type": "string"
+              },
+              "mark_anchor": {
+                "default": "_top",
+                "pattern": "^[a-zA-Z0-9_][a-zA-Z0-9_.-]{0,63}$",
+                "type": "string"
+              }
+            },
+            "required": [
+              "op",
+              "base",
+              "mark"
+            ],
+            "type": "object"
+          },
+          "Contour": {
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "pattern": "^[a-zA-Z0-9_][a-zA-Z0-9_.-]{0,63}$",
+                "type": "string"
+              },
+              "points": {
+                "items": {
+                  "$ref": "#/$defs/Point"
+                },
+                "maxItems": 2048,
+                "minItems": 2,
+                "type": "array"
+              }
+            },
+            "required": [
+              "id",
+              "points"
+            ],
+            "type": "object"
+          },
+          "Duplicate": {
+            "additionalProperties": false,
+            "properties": {
+              "op": {
+                "const": "duplicate",
+                "type": "string"
+              },
+              "source": {
+                "pattern": "^(?:\\.notdef|[a-zA-Z_][a-zA-Z0-9_.]{0,62})$",
+                "type": "string"
+              },
+              "matrix": {
+                "default": [
+                  1,
+                  0,
+                  0,
+                  1,
+                  0,
+                  0
+                ],
+                "maxItems": 6,
+                "minItems": 6,
+                "prefixItems": [
+                  {
+                    "maximum": 16,
+                    "minimum": -16,
+                    "type": "number"
+                  },
+                  {
+                    "maximum": 16,
+                    "minimum": -16,
+                    "type": "number"
+                  },
+                  {
+                    "maximum": 16,
+                    "minimum": -16,
+                    "type": "number"
+                  },
+                  {
+                    "maximum": 16,
+                    "minimum": -16,
+                    "type": "number"
+                  },
+                  {
+                    "maximum": 16000,
+                    "minimum": -16000,
+                    "type": "number"
+                  },
+                  {
+                    "maximum": 16000,
+                    "minimum": -16000,
+                    "type": "number"
+                  }
+                ],
+                "type": "array"
+              }
+            },
+            "required": [
+              "op",
+              "source"
+            ],
+            "type": "object"
+          },
+          "FilledPath": {
+            "additionalProperties": false,
+            "properties": {
+              "op": {
+                "const": "filled_path",
+                "type": "string"
+              },
+              "paths": {
+                "items": {
+                  "maxLength": 16000,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "maxItems": 32,
+                "minItems": 1,
+                "type": "array"
+              },
+              "id": {
+                "default": "outline",
+                "pattern": "^[a-zA-Z_][a-zA-Z0-9_]{0,23}$",
+                "type": "string"
+              },
+              "replace": {
+                "default": false,
+                "type": "boolean"
+              },
+              "advance": {
+                "anyOf": [
+                  {
+                    "maximum": 16000,
+                    "minimum": 0,
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              }
+            },
+            "required": [
+              "op",
+              "paths"
+            ],
+            "type": "object"
+          },
+          "Glyph": {
+            "additionalProperties": false,
+            "properties": {
+              "advance": {
+                "default": 600,
+                "maximum": 16000,
+                "minimum": 0,
+                "type": "number"
+              },
+              "unicodes": {
+                "items": {
+                  "maximum": 1114111,
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "maxItems": 32,
+                "type": "array"
+              },
+              "contours": {
+                "items": {
+                  "$ref": "#/$defs/Contour"
+                },
+                "maxItems": 64,
+                "type": "array"
+              },
+              "components": {
+                "items": {
+                  "$ref": "#/$defs/Component"
+                },
+                "maxItems": 32,
+                "type": "array"
+              },
+              "anchors": {
+                "items": {
+                  "$ref": "#/$defs/Anchor"
+                },
+                "maxItems": 32,
+                "type": "array"
+              }
+            },
+            "type": "object"
+          },
+          "GlyphChange": {
+            "additionalProperties": false,
+            "properties": {
+              "glyph_id": {
+                "pattern": "^(?:\\.notdef|[a-zA-Z_][a-zA-Z0-9_.]{0,62})$",
+                "type": "string"
+              },
+              "create": {
+                "default": false,
+                "type": "boolean"
+              },
+              "operations": {
+                "items": {
+                  "discriminator": {
+                    "mapping": {
+                      "compose_accent": "#/$defs/ComposeAccent",
+                      "duplicate": "#/$defs/Duplicate",
+                      "filled_path": "#/$defs/FilledPath",
+                      "move_point": "#/$defs/MovePoint",
+                      "primitive": "#/$defs/Primitive",
+                      "put_anchor": "#/$defs/PutAnchor",
+                      "put_component": "#/$defs/PutComponent",
+                      "put_contour": "#/$defs/PutContour",
+                      "remove": "#/$defs/Remove",
+                      "replace_glyph": "#/$defs/ReplaceGlyph",
+                      "set_unicodes": "#/$defs/SetUnicodes",
+                      "stroke_path": "#/$defs/StrokePath",
+                      "transform": "#/$defs/Transform"
+                    },
+                    "propertyName": "op"
+                  },
+                  "oneOf": [
+                    {
+                      "$ref": "#/$defs/PutContour"
+                    },
+                    {
+                      "$ref": "#/$defs/MovePoint"
+                    },
+                    {
+                      "$ref": "#/$defs/Transform"
+                    },
+                    {
+                      "$ref": "#/$defs/PutComponent"
+                    },
+                    {
+                      "$ref": "#/$defs/PutAnchor"
+                    },
+                    {
+                      "$ref": "#/$defs/Remove"
+                    },
+                    {
+                      "$ref": "#/$defs/SetUnicodes"
+                    },
+                    {
+                      "$ref": "#/$defs/ReplaceGlyph"
+                    },
+                    {
+                      "$ref": "#/$defs/FilledPath"
+                    },
+                    {
+                      "$ref": "#/$defs/StrokePath"
+                    },
+                    {
+                      "$ref": "#/$defs/Primitive"
+                    },
+                    {
+                      "$ref": "#/$defs/Duplicate"
+                    },
+                    {
+                      "$ref": "#/$defs/ComposeAccent"
+                    }
+                  ]
+                },
+                "maxItems": 128,
+                "minItems": 1,
+                "type": "array"
+              }
+            },
+            "required": [
+              "glyph_id",
+              "operations"
+            ],
+            "type": "object"
+          },
+          "KernGroup": {
+            "additionalProperties": false,
+            "properties": {
+              "op": {
+                "const": "kern_group",
+                "type": "string"
+              },
+              "name": {
+                "pattern": "^public\\.kern[12]\\.[a-zA-Z0-9_]{1,40}$",
+                "type": "string"
+              },
+              "glyphs": {
+                "anyOf": [
+                  {
+                    "items": {
+                      "pattern": "^(?:\\.notdef|[a-zA-Z_][a-zA-Z0-9_.]{0,62})$",
+                      "type": "string"
+                    },
+                    "maxItems": 512,
+                    "type": "array"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "op",
+              "name",
+              "glyphs"
+            ],
+            "type": "object"
+          },
+          "KernPair": {
+            "additionalProperties": false,
+            "properties": {
+              "op": {
+                "const": "kern_pair",
+                "type": "string"
+              },
+              "left": {
+                "pattern": "^(?:\\.notdef|[a-zA-Z_][a-zA-Z0-9_.]{0,62})$",
+                "type": "string"
+              },
+              "right": {
+                "pattern": "^(?:\\.notdef|[a-zA-Z_][a-zA-Z0-9_.]{0,62})$",
+                "type": "string"
+              },
+              "value": {
+                "anyOf": [
+                  {
+                    "maximum": 16000,
+                    "minimum": -16000,
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "op",
+              "left",
+              "right",
+              "value"
+            ],
+            "type": "object"
+          },
+          "MovePoint": {
+            "additionalProperties": false,
+            "properties": {
+              "op": {
+                "const": "move_point",
+                "type": "string"
+              },
+              "point_id": {
+                "pattern": "^[a-zA-Z0-9_][a-zA-Z0-9_.-]{0,63}$",
+                "type": "string"
+              },
+              "x": {
+                "maximum": 16000,
+                "minimum": -16000,
+                "type": "number"
+              },
+              "y": {
+                "maximum": 16000,
+                "minimum": -16000,
+                "type": "number"
+              }
+            },
+            "required": [
+              "op",
+              "point_id",
+              "x",
+              "y"
+            ],
+            "type": "object"
+          },
+          "Point": {
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "pattern": "^[a-zA-Z0-9_][a-zA-Z0-9_.-]{0,63}$",
+                "type": "string"
+              },
+              "x": {
+                "maximum": 16000,
+                "minimum": -16000,
+                "type": "number"
+              },
+              "y": {
+                "maximum": 16000,
+                "minimum": -16000,
+                "type": "number"
+              },
+              "type": {
+                "default": "line",
+                "enum": [
+                  "line",
+                  "curve",
+                  "qcurve",
+                  "offcurve"
+                ],
+                "type": "string"
+              },
+              "smooth": {
+                "default": false,
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "id",
+              "x",
+              "y"
+            ],
+            "type": "object"
+          },
+          "Primitive": {
+            "additionalProperties": false,
+            "properties": {
+              "op": {
+                "const": "primitive",
+                "type": "string"
+              },
+              "shape": {
+                "enum": [
+                  "rectangle",
+                  "ellipse"
+                ],
+                "type": "string"
+              },
+              "x": {
+                "maximum": 16000,
+                "minimum": -16000,
+                "type": "number"
+              },
+              "y": {
+                "maximum": 16000,
+                "minimum": -16000,
+                "type": "number"
+              },
+              "width": {
+                "exclusiveMinimum": 0,
+                "maximum": 16000,
+                "type": "number"
+              },
+              "height": {
+                "exclusiveMinimum": 0,
+                "maximum": 16000,
+                "type": "number"
+              },
+              "id": {
+                "default": "outline",
+                "pattern": "^[a-zA-Z_][a-zA-Z0-9_]{0,23}$",
+                "type": "string"
+              },
+              "replace": {
+                "default": false,
+                "type": "boolean"
+              },
+              "advance": {
+                "anyOf": [
+                  {
+                    "maximum": 16000,
+                    "minimum": 0,
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              }
+            },
+            "required": [
+              "op",
+              "shape",
+              "x",
+              "y",
+              "width",
+              "height"
+            ],
+            "type": "object"
+          },
+          "PutAnchor": {
+            "additionalProperties": false,
+            "properties": {
+              "op": {
+                "const": "put_anchor",
+                "type": "string"
+              },
+              "anchor": {
+                "$ref": "#/$defs/Anchor"
+              },
+              "replace": {
+                "default": false,
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "op",
+              "anchor"
+            ],
+            "type": "object"
+          },
+          "PutComponent": {
+            "additionalProperties": false,
+            "properties": {
+              "op": {
+                "const": "put_component",
+                "type": "string"
+              },
+              "component": {
+                "$ref": "#/$defs/Component"
+              },
+              "replace": {
+                "default": false,
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "op",
+              "component"
+            ],
+            "type": "object"
+          },
+          "PutContour": {
+            "additionalProperties": false,
+            "properties": {
+              "op": {
+                "const": "put_contour",
+                "type": "string"
+              },
+              "contour": {
+                "$ref": "#/$defs/Contour"
+              },
+              "replace": {
+                "default": false,
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "op",
+              "contour"
+            ],
+            "type": "object"
+          },
+          "Remove": {
+            "additionalProperties": false,
+            "properties": {
+              "op": {
+                "const": "remove",
+                "type": "string"
+              },
+              "kind": {
+                "enum": [
+                  "contour",
+                  "component",
+                  "anchor"
+                ],
+                "type": "string"
+              },
+              "id": {
+                "pattern": "^[a-zA-Z0-9_][a-zA-Z0-9_.-]{0,63}$",
+                "type": "string"
+              }
+            },
+            "required": [
+              "op",
+              "kind",
+              "id"
+            ],
+            "type": "object"
+          },
+          "ReplaceGlyph": {
+            "additionalProperties": false,
+            "properties": {
+              "op": {
+                "const": "replace_glyph",
+                "type": "string"
+              },
+              "glyph": {
+                "$ref": "#/$defs/Glyph"
+              }
+            },
+            "required": [
+              "op",
+              "glyph"
+            ],
+            "type": "object"
+          },
+          "SetAdvance": {
+            "additionalProperties": false,
+            "properties": {
+              "op": {
+                "const": "advance",
+                "type": "string"
+              },
+              "glyph_id": {
+                "pattern": "^(?:\\.notdef|[a-zA-Z_][a-zA-Z0-9_.]{0,62})$",
+                "type": "string"
+              },
+              "value": {
+                "maximum": 16000,
+                "minimum": 0,
+                "type": "number"
+              }
+            },
+            "required": [
+              "op",
+              "glyph_id",
+              "value"
+            ],
+            "type": "object"
+          },
+          "SetUnicodes": {
+            "additionalProperties": false,
+            "properties": {
+              "op": {
+                "const": "set_unicodes",
+                "type": "string"
+              },
+              "unicodes": {
+                "items": {
+                  "maximum": 1114111,
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "maxItems": 32,
+                "type": "array"
+              }
+            },
+            "required": [
+              "op",
+              "unicodes"
+            ],
+            "type": "object"
+          },
+          "StrokePath": {
+            "additionalProperties": false,
+            "properties": {
+              "op": {
+                "const": "stroke_path",
+                "type": "string"
+              },
+              "paths": {
+                "items": {
+                  "maxLength": 16000,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "maxItems": 32,
+                "minItems": 1,
+                "type": "array"
+              },
+              "id": {
+                "default": "outline",
+                "pattern": "^[a-zA-Z_][a-zA-Z0-9_]{0,23}$",
+                "type": "string"
+              },
+              "replace": {
+                "default": false,
+                "type": "boolean"
+              },
+              "advance": {
+                "anyOf": [
+                  {
+                    "maximum": 16000,
+                    "minimum": 0,
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              },
+              "width": {
+                "exclusiveMinimum": 0,
+                "maximum": 2000,
+                "type": "number"
+              },
+              "cap": {
+                "default": "round",
+                "enum": [
+                  "round",
+                  "butt",
+                  "square"
+                ],
+                "type": "string"
+              },
+              "join": {
+                "default": "round",
+                "enum": [
+                  "round",
+                  "bevel",
+                  "miter"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "op",
+              "paths",
+              "width"
+            ],
+            "type": "object"
+          },
+          "Transform": {
+            "additionalProperties": false,
+            "properties": {
+              "op": {
+                "const": "transform",
+                "type": "string"
+              },
+              "matrix": {
+                "maxItems": 6,
+                "minItems": 6,
+                "prefixItems": [
+                  {
+                    "maximum": 16,
+                    "minimum": -16,
+                    "type": "number"
+                  },
+                  {
+                    "maximum": 16,
+                    "minimum": -16,
+                    "type": "number"
+                  },
+                  {
+                    "maximum": 16,
+                    "minimum": -16,
+                    "type": "number"
+                  },
+                  {
+                    "maximum": 16,
+                    "minimum": -16,
+                    "type": "number"
+                  },
+                  {
+                    "maximum": 16000,
+                    "minimum": -16000,
+                    "type": "number"
+                  },
+                  {
+                    "maximum": 16000,
+                    "minimum": -16000,
+                    "type": "number"
+                  }
+                ],
+                "type": "array"
+              },
+              "contour_ids": {
+                "anyOf": [
+                  {
+                    "items": {
+                      "pattern": "^[a-zA-Z0-9_][a-zA-Z0-9_.-]{0,63}$",
+                      "type": "string"
+                    },
+                    "maxItems": 64,
+                    "type": "array"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              }
+            },
+            "required": [
+              "op",
+              "matrix"
+            ],
+            "type": "object"
+          }
+        },
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "summary": {
+            "type": "string"
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "revision": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "changed": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "data": {
+            "additionalProperties": true,
+            "type": "object"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          }
+        },
+        "required": [
+          "ok",
+          "summary"
+        ],
+        "type": "object",
+        "additionalProperties": false
       },
       "annotations": {
         "readOnlyHint": false,
@@ -1749,11 +2946,9 @@
       "name": "render_glyph",
       "description": "Persist and return PNG image content from the selected UFO revision, with optional guides/handles. Comparison uses the same frame.",
       "inputSchema": {
-        "additionalProperties": false,
         "properties": {
           "project_id": {
             "pattern": "^[a-f0-9]{32}$",
-            "title": "Project Id",
             "type": "string"
           },
           "revision": {
@@ -1766,12 +2961,26 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "title": "Revision"
+            "default": null
           },
           "glyph_id": {
             "pattern": "^(?:\\.notdef|[a-zA-Z_][a-zA-Z0-9_.]{0,62})$",
-            "title": "Glyph Id",
+            "type": "string"
+          },
+          "detail": {
+            "default": "summary",
+            "enum": [
+              "summary",
+              "full"
+            ],
+            "type": "string"
+          },
+          "image_mode": {
+            "default": "inline",
+            "enum": [
+              "inline",
+              "resource"
+            ],
             "type": "string"
           },
           "compare_revision": {
@@ -1784,31 +2993,26 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "title": "Compare Revision"
+            "default": null
           },
           "width": {
             "default": 640,
             "maximum": 1024,
             "minimum": 128,
-            "title": "Width",
             "type": "integer"
           },
           "height": {
             "default": 640,
             "maximum": 1024,
             "minimum": 128,
-            "title": "Height",
             "type": "integer"
           },
           "guides": {
             "default": true,
-            "title": "Guides",
             "type": "boolean"
           },
           "points": {
             "default": true,
-            "title": "Points",
             "type": "boolean"
           }
         },
@@ -1816,18 +3020,15 @@
           "project_id",
           "glyph_id"
         ],
-        "title": "RenderGlyph",
-        "type": "object"
+        "type": "object",
+        "additionalProperties": false
       },
       "outputSchema": {
-        "additionalProperties": false,
         "properties": {
           "ok": {
-            "title": "Ok",
             "type": "boolean"
           },
           "summary": {
-            "title": "Summary",
             "type": "string"
           },
           "project_id": {
@@ -1839,8 +3040,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "title": "Project Id"
+            "default": null
           },
           "revision": {
             "anyOf": [
@@ -1851,26 +3051,22 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "title": "Revision"
+            "default": null
           },
           "changed": {
             "items": {
               "type": "string"
             },
-            "title": "Changed",
             "type": "array"
           },
           "warnings": {
             "items": {
               "type": "string"
             },
-            "title": "Warnings",
             "type": "array"
           },
           "data": {
             "additionalProperties": true,
-            "title": "Data",
             "type": "object"
           },
           "error": {
@@ -1883,16 +3079,15 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "title": "Error"
+            "default": null
           }
         },
         "required": [
           "ok",
           "summary"
         ],
-        "title": "Result",
-        "type": "object"
+        "type": "object",
+        "additionalProperties": false
       },
       "annotations": {
         "readOnlyHint": false,
@@ -1905,11 +3100,9 @@
       "name": "render_text",
       "description": "Compile the revision, shape with HarfBuzz and return monochrome FreeType PNGs. Missing Unicode is reported; no fallback font. Optional same-conditions revision comparison.",
       "inputSchema": {
-        "additionalProperties": false,
         "properties": {
           "project_id": {
             "pattern": "^[a-f0-9]{32}$",
-            "title": "Project Id",
             "type": "string"
           },
           "revision": {
@@ -1922,8 +3115,24 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "title": "Revision"
+            "default": null
+          },
+          "detail": {
+            "default": "summary",
+            "enum": [
+              "summary",
+              "positions",
+              "full"
+            ],
+            "type": "string"
+          },
+          "image_mode": {
+            "default": "inline",
+            "enum": [
+              "inline",
+              "resource"
+            ],
+            "type": "string"
           },
           "compare_revision": {
             "anyOf": [
@@ -1935,13 +3144,11 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "title": "Compare Revision"
+            "default": null
           },
           "text": {
             "maxLength": 256,
             "minLength": 1,
-            "title": "Text",
             "type": "string"
           },
           "sizes": {
@@ -1956,24 +3163,20 @@
             },
             "maxItems": 4,
             "minItems": 1,
-            "title": "Sizes",
             "type": "array"
           },
           "kern": {
             "default": true,
-            "title": "Kern",
             "type": "boolean"
           },
           "width": {
             "default": 1000,
             "maximum": 2048,
             "minimum": 128,
-            "title": "Width",
             "type": "integer"
           },
           "dark": {
             "default": false,
-            "title": "Dark",
             "type": "boolean"
           }
         },
@@ -1981,18 +3184,15 @@
           "project_id",
           "text"
         ],
-        "title": "RenderText",
-        "type": "object"
+        "type": "object",
+        "additionalProperties": false
       },
       "outputSchema": {
-        "additionalProperties": false,
         "properties": {
           "ok": {
-            "title": "Ok",
             "type": "boolean"
           },
           "summary": {
-            "title": "Summary",
             "type": "string"
           },
           "project_id": {
@@ -2004,8 +3204,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "title": "Project Id"
+            "default": null
           },
           "revision": {
             "anyOf": [
@@ -2016,26 +3215,22 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "title": "Revision"
+            "default": null
           },
           "changed": {
             "items": {
               "type": "string"
             },
-            "title": "Changed",
             "type": "array"
           },
           "warnings": {
             "items": {
               "type": "string"
             },
-            "title": "Warnings",
             "type": "array"
           },
           "data": {
             "additionalProperties": true,
-            "title": "Data",
             "type": "object"
           },
           "error": {
@@ -2048,16 +3243,15 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "title": "Error"
+            "default": null
           }
         },
         "required": [
           "ok",
           "summary"
         ],
-        "title": "Result",
-        "type": "object"
+        "type": "object",
+        "additionalProperties": false
       },
       "annotations": {
         "readOnlyHint": false,
@@ -2070,11 +3264,9 @@
       "name": "font_validate",
       "description": "Run technical checks, compile a TTF, inspect tables and corpus coverage. Reports errors, warnings and observations; does not assess artistic merit.",
       "inputSchema": {
-        "additionalProperties": false,
         "properties": {
           "project_id": {
             "pattern": "^[a-f0-9]{32}$",
-            "title": "Project Id",
             "type": "string"
           },
           "revision": {
@@ -2087,31 +3279,34 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "title": "Revision"
+            "default": null
+          },
+          "detail": {
+            "default": "summary",
+            "enum": [
+              "summary",
+              "full"
+            ],
+            "type": "string"
           },
           "corpus": {
             "default": "",
             "maxLength": 4000,
-            "title": "Corpus",
             "type": "string"
           }
         },
         "required": [
           "project_id"
         ],
-        "title": "Validate",
-        "type": "object"
+        "type": "object",
+        "additionalProperties": false
       },
       "outputSchema": {
-        "additionalProperties": false,
         "properties": {
           "ok": {
-            "title": "Ok",
             "type": "boolean"
           },
           "summary": {
-            "title": "Summary",
             "type": "string"
           },
           "project_id": {
@@ -2123,8 +3318,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "title": "Project Id"
+            "default": null
           },
           "revision": {
             "anyOf": [
@@ -2135,26 +3329,22 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "title": "Revision"
+            "default": null
           },
           "changed": {
             "items": {
               "type": "string"
             },
-            "title": "Changed",
             "type": "array"
           },
           "warnings": {
             "items": {
               "type": "string"
             },
-            "title": "Warnings",
             "type": "array"
           },
           "data": {
             "additionalProperties": true,
-            "title": "Data",
             "type": "object"
           },
           "error": {
@@ -2167,16 +3357,15 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "title": "Error"
+            "default": null
           }
         },
         "required": [
           "ok",
           "summary"
         ],
-        "title": "Result",
-        "type": "object"
+        "type": "object",
+        "additionalProperties": false
       },
       "annotations": {
         "readOnlyHint": false,
@@ -2189,11 +3378,9 @@
       "name": "font_build",
       "description": "Build real TTF and/or WOFF2 from a frozen revision. Returns persistent relative paths and hashes. Does not alter UFO sources.",
       "inputSchema": {
-        "additionalProperties": false,
         "properties": {
           "project_id": {
             "pattern": "^[a-f0-9]{32}$",
-            "title": "Project Id",
             "type": "string"
           },
           "revision": {
@@ -2206,8 +3393,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "title": "Revision"
+            "default": null
           },
           "formats": {
             "default": [
@@ -2223,25 +3409,21 @@
             },
             "maxItems": 2,
             "minItems": 1,
-            "title": "Formats",
             "type": "array"
           }
         },
         "required": [
           "project_id"
         ],
-        "title": "Build",
-        "type": "object"
+        "type": "object",
+        "additionalProperties": false
       },
       "outputSchema": {
-        "additionalProperties": false,
         "properties": {
           "ok": {
-            "title": "Ok",
             "type": "boolean"
           },
           "summary": {
-            "title": "Summary",
             "type": "string"
           },
           "project_id": {
@@ -2253,8 +3435,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "title": "Project Id"
+            "default": null
           },
           "revision": {
             "anyOf": [
@@ -2265,26 +3446,22 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "title": "Revision"
+            "default": null
           },
           "changed": {
             "items": {
               "type": "string"
             },
-            "title": "Changed",
             "type": "array"
           },
           "warnings": {
             "items": {
               "type": "string"
             },
-            "title": "Warnings",
             "type": "array"
           },
           "data": {
             "additionalProperties": true,
-            "title": "Data",
             "type": "object"
           },
           "error": {
@@ -2297,16 +3474,15 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "title": "Error"
+            "default": null
           }
         },
         "required": [
           "ok",
           "summary"
         ],
-        "title": "Result",
-        "type": "object"
+        "type": "object",
+        "additionalProperties": false
       },
       "annotations": {
         "readOnlyHint": false,
@@ -2319,11 +3495,9 @@
       "name": "history_list",
       "description": "List committed revisions and summaries with pagination; interrupted uncommitted stages are excluded.",
       "inputSchema": {
-        "additionalProperties": false,
         "properties": {
           "project_id": {
             "pattern": "^[a-f0-9]{32}$",
-            "title": "Project Id",
             "type": "string"
           },
           "revision": {
@@ -2336,39 +3510,45 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "title": "Revision"
+            "default": null
+          },
+          "detail": {
+            "default": "summary",
+            "enum": [
+              "summary",
+              "full"
+            ],
+            "type": "string"
+          },
+          "include_total": {
+            "default": false,
+            "type": "boolean"
           },
           "offset": {
             "default": 0,
             "maximum": 100000,
             "minimum": 0,
-            "title": "Offset",
             "type": "integer"
           },
           "limit": {
             "default": 50,
             "maximum": 100,
             "minimum": 1,
-            "title": "Limit",
             "type": "integer"
           }
         },
         "required": [
           "project_id"
         ],
-        "title": "Page",
-        "type": "object"
+        "type": "object",
+        "additionalProperties": false
       },
       "outputSchema": {
-        "additionalProperties": false,
         "properties": {
           "ok": {
-            "title": "Ok",
             "type": "boolean"
           },
           "summary": {
-            "title": "Summary",
             "type": "string"
           },
           "project_id": {
@@ -2380,8 +3560,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "title": "Project Id"
+            "default": null
           },
           "revision": {
             "anyOf": [
@@ -2392,26 +3571,22 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "title": "Revision"
+            "default": null
           },
           "changed": {
             "items": {
               "type": "string"
             },
-            "title": "Changed",
             "type": "array"
           },
           "warnings": {
             "items": {
               "type": "string"
             },
-            "title": "Warnings",
             "type": "array"
           },
           "data": {
             "additionalProperties": true,
-            "title": "Data",
             "type": "object"
           },
           "error": {
@@ -2424,16 +3599,15 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "title": "Error"
+            "default": null
           }
         },
         "required": [
           "ok",
           "summary"
         ],
-        "title": "Result",
-        "type": "object"
+        "type": "object",
+        "additionalProperties": false
       },
       "annotations": {
         "readOnlyHint": true,
@@ -2446,27 +3620,22 @@
       "name": "history_restore",
       "description": "Restore a committed revision by creating a NEW revision; requires the current expected_revision and preserves history.",
       "inputSchema": {
-        "additionalProperties": false,
         "properties": {
           "project_id": {
             "pattern": "^[a-f0-9]{32}$",
-            "title": "Project Id",
             "type": "string"
           },
           "expected_revision": {
             "pattern": "^[a-f0-9]{32}$",
-            "title": "Expected Revision",
             "type": "string"
           },
           "summary": {
             "default": "",
             "maxLength": 500,
-            "title": "Summary",
             "type": "string"
           },
           "target_revision": {
             "pattern": "^[a-f0-9]{32}$",
-            "title": "Target Revision",
             "type": "string"
           }
         },
@@ -2475,18 +3644,15 @@
           "expected_revision",
           "target_revision"
         ],
-        "title": "Restore",
-        "type": "object"
+        "type": "object",
+        "additionalProperties": false
       },
       "outputSchema": {
-        "additionalProperties": false,
         "properties": {
           "ok": {
-            "title": "Ok",
             "type": "boolean"
           },
           "summary": {
-            "title": "Summary",
             "type": "string"
           },
           "project_id": {
@@ -2498,8 +3664,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "title": "Project Id"
+            "default": null
           },
           "revision": {
             "anyOf": [
@@ -2510,26 +3675,22 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "title": "Revision"
+            "default": null
           },
           "changed": {
             "items": {
               "type": "string"
             },
-            "title": "Changed",
             "type": "array"
           },
           "warnings": {
             "items": {
               "type": "string"
             },
-            "title": "Warnings",
             "type": "array"
           },
           "data": {
             "additionalProperties": true,
-            "title": "Data",
             "type": "object"
           },
           "error": {
@@ -2542,16 +3703,15 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "title": "Error"
+            "default": null
           }
         },
         "required": [
           "ok",
           "summary"
         ],
-        "title": "Result",
-        "type": "object"
+        "type": "object",
+        "additionalProperties": false
       },
       "annotations": {
         "readOnlyHint": false,
@@ -2560,5 +3720,6 @@
         "openWorldHint": false
       }
     }
-  ]
+  ],
+  "resultType": "complete"
 }

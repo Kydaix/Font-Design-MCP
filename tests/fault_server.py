@@ -30,6 +30,14 @@ elif fault == "compiler":
         return original_compiler(command, cwd, timeout, epoch)
 
     build.run_compiler = failed
+elif fault == "slowcompiler":
+    original_compiler = build.run_compiler
+
+    def slow(command, cwd, timeout=60, epoch=None):
+        script = "import os,time; from pathlib import Path; Path('child.pid').write_text(str(os.getpid())); time.sleep(60)"
+        return original_compiler([sys.executable, "-c", script], cwd, timeout, epoch)
+
+    build.run_compiler = slow
 else:
     raise ValueError(fault)
 anyio.run(serve, Path(root))

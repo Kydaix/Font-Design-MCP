@@ -27,15 +27,19 @@ Bundled native FreeType is used under the FreeType License (FTL); portions of th
 | glyphsLib | 6.14.0 | Apache Software License 2.0 |
 | h11 | 0.16.0 | MIT |
 | httpcore | 1.0.9 | BSD-3-Clause |
+| httpcore2 | 2.12.0 | BSD-3-Clause |
 | httpx | 0.28.1 | BSD-3-Clause |
 | httpx-sse | 0.4.3 | MIT |
+| httpx2 | 2.12.0 | BSD-3-Clause |
 | idna | 3.19 | BSD-3-Clause |
 | iniconfig | 2.3.0 | MIT |
 | jsonschema | 4.26.0 | MIT |
 | jsonschema-specifications | 2025.9.1 | MIT |
 | lxml | 6.1.3 | BSD-3-Clause |
-| mcp | 1.30.0 | MIT |
+| mcp | 2.2.0 | MIT |
+| mcp-types | 2.2.0 | MIT |
 | openstep_plist | 0.5.2 | MIT |
+| opentelemetry-api | 1.44.0 | Apache-2.0 |
 | packaging | 26.3 | Apache-2.0 OR BSD-2-Clause |
 | pillow | 12.3.0 | MIT-CMU |
 | pluggy | 1.6.0 | MIT |
@@ -55,6 +59,7 @@ Bundled native FreeType is used under the FreeType License (FTL); portions of th
 | ruff | 0.16.6 | MIT |
 | sse-starlette | 3.4.11 | BSD-3-Clause |
 | starlette | 1.6.0 | BSD-3-Clause |
+| truststore | 0.10.4 | MIT |
 | typing-inspection | 0.4.4 | MIT |
 | typing_extensions | 4.16.0 | PSF-2.0 |
 | ufo2ft | 3.9.0 | MIT |

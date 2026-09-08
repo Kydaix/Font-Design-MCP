@@ -2,6 +2,8 @@
 
 # Font Design MCP
 
+<!-- mcp-name: io.github.Kydaix/font-design-mcp -->
+
 **Draw, inspect, refine, and build fonts through MCP.**
 
 A local MCP server for AI-assisted type design, from vector outlines to TTF and WOFF2.
@@ -20,6 +22,32 @@ A local MCP server for AI-assisted type design, from vector outlines to TTF and 
 
 ## Get started
 
+Version **0.2.0** adds atomic multi-glyph edits, reusable TTF/WOFF2 compilations, compact responses,
+numeric drawing primitives and immutable MCP resources. See [upgrade notes and audit results](docs/AUDIT-IMPLEMENTATION.md).
+
+To use a built wheel without cloning, replace the wheel path below with your downloaded artifact:
+
+```sh
+uvx --python 3.13 --from /absolute/path/font_design_mcp-0.2.0-py3-none-any.whl font-design-mcp doctor --build
+uvx --python 3.13 --from /absolute/path/font_design_mcp-0.2.0-py3-none-any.whl font-design-mcp config --from /absolute/path/font_design_mcp-0.2.0-py3-none-any.whl
+```
+
+After 0.2.0 is published to PyPI, the equivalent command is
+`uvx --python 3.13 font-design-mcp@0.2.0 doctor --build`. Publication is prepared, not claimed here.
+`config --from /absolute/path/package.whl` prints a client configuration using that wheel;
+plain `config` targets the versioned PyPI package. It never changes client settings.
+The first UV invocation downloads dependencies; run `doctor --build` before connecting a host.
+
+`--workspace` overrides `FONT_DESIGN_MCP_WORKSPACE`, which overrides the dedicated user-data default:
+`%LOCALAPPDATA%/font-design-mcp/workspace` on Windows, `~/Library/Application Support/font-design-mcp/workspace`
+on macOS, `$XDG_DATA_HOME/font-design-mcp/workspace` (or `~/.local/share/...`) on Linux.
+The workspace stays outside UV's cache and survives upgrades or extension removal.
+
+The [MCPB extension](mcpb/manifest.json) targets hosts supporting the UV runtime in manifest 0.4.
+See [distribution and publication](docs/DISTRIBUTION.md) for building, tests and host-validation limits.
+
+### Development from source
+
 1. Clone the repository and install the dependencies with the commands below.
 2. Run the diagnostic and demo to generate your first font specimen.
 3. [Connect your MCP client](#connect-a-client) to start designing with an agent.
@@ -35,7 +63,7 @@ uv run --frozen font-design-mcp doctor
 uv run --frozen python examples/demo.py --workspace ./workspace
 ```
 
-`doctor` checks the installed dependencies and rasterizes a PNG. Font operations run locally after installation;
+`doctor` checks dependencies and rasterizes a PNG; `doctor --build` also compiles TTF and WOFF2. Font operations run locally after installation;
 the server needs no model API key or proprietary editor. The client agent may use a remote model.
 
 The demo launches a real STDIO server through the official MCP Python SDK. It draws **A, V, O, Q, acute, and Á**,
@@ -177,6 +205,7 @@ data, readable summaries, revisions, warnings, and identifiable errors.
 | `project_update` | Update the brief, supported metadata, vertical metrics, or decision journal |
 | `glyph_get` | Inspect contours, IDs, components, anchors, advance, bounds, and bearings |
 | `glyph_edit` | Apply a typed, atomic vector-editing batch to a glyph |
+| `font_edit` | Edit up to 128 glyphs and their spacing atomically in one revision |
 | `spacing_edit` | Set advances, side bearings, kerning pairs, and kerning groups |
 | `render_glyph` | Render a glyph with optional guides, handles, and revision comparison |
 | `render_text` | Compile, shape, and render text at multiple sizes |
@@ -186,6 +215,11 @@ data, readable summaries, revisions, warnings, and identifiable errors.
 | `history_restore` | Restore an earlier state by creating a new revision |
 
 [Exact JSON schemas](docs/tool-schemas.json) · [Detailed tool reference, in French](docs/TOOLS.md)
+
+In 0.2.0, inspection, glyph reads/edits, batch edits, validation, and renders default to
+`detail="summary"`. Use `detail="full"` for complete data, including point IDs before editing them;
+`render_text` also accepts `detail="positions"`. Rendered images remain inline by default;
+`image_mode="resource"` returns references for retrieval through MCP resources.
 
 ## Save and restore your work
 
@@ -238,7 +272,8 @@ uv build
 ```
 
 Output: `dist/`. Dependency versions are pinned in `pyproject.toml` and `uv.lock`;
-`requirements.lock` provides a hashed export for pip installations.
+`requirements.lock` provides hashed dependencies for pip installations. Install them with
+`pip install --require-hashes -r requirements.lock`, then install the built wheel with `pip install --no-deps /path/to/package.whl`.
 
 ### Checks
 
@@ -254,9 +289,10 @@ compiler failure, restart, and interrupted writes.
 
 | Verification | Evidence |
 | --- | --- |
-| **Windows 11 x64, Python 3.11** | 21 local tests passed, including real STDIO calls, builds, rendering, recovery, and embedding defaults |
+| **Windows 11 x64, Python 3.11** | 36 local tests passed, including real STDIO calls, atomic multi-glyph edits, compilation caching, rendering, and recovery |
 | **Windows, macOS, Linux runners** | [CI results](https://github.com/Kydaix/font-design-mcp/actions/workflows/ci.yml), covering Python 3.11 and 3.13 |
 | **Installed wheel** | Entry point and full MCP demo tested in a separate environment |
+| **MCPB extension** | Installed outside the repository; diagnostic, STDIO calls, and TTF/WOFF2 exports tested |
 
 The CI result covers its runner environments, not every OS version or CPU architecture. The
 [original delivery report, in French](docs/TESTING.md) records the local tests before CI was first run.
@@ -273,7 +309,8 @@ guides currently remain in French, except the dependency inventory and machine-r
 | [Architecture](docs/ARCHITECTURE.md) | Domain, persistence, rendering, compilation, limits, and recovery |
 | [Test report](docs/TESTING.md) | Original acceptance evidence, captures, and remaining visual review |
 | [Dependency licenses](docs/DEPENDENCIES.md) | Locked dependencies and native-library notices |
-| [Initial audit](docs/AUDIT.md) | Development environment, technical choices, and official sources |
+| [Technical audit](docs/audit.md) | Performance, output size and installation findings |
+| [Audit implementation](docs/AUDIT-IMPLEMENTATION.md) | Changes, measurements and remaining publication/host checks |
 
 ## Credits and license
 

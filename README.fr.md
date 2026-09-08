@@ -20,6 +20,32 @@ Un serveur MCP local pour créer des polices avec un agent IA, du dessin vectori
 
 ## Démarrer
 
+La version **0.2.0** ajoute les transactions multi-glyphes, le cache TTF/WOFF2, les réponses compactes,
+les primitives de dessin et les ressources MCP immuables. Voir le [suivi de l’audit](docs/AUDIT-IMPLEMENTATION.md).
+
+Pour utiliser un wheel construit sans cloner le dépôt, remplacez le chemin ci-dessous par celui du fichier téléchargé :
+
+```sh
+uvx --python 3.13 --from /chemin/absolu/font_design_mcp-0.2.0-py3-none-any.whl font-design-mcp doctor --build
+uvx --python 3.13 --from /chemin/absolu/font_design_mcp-0.2.0-py3-none-any.whl font-design-mcp config --from /chemin/absolu/font_design_mcp-0.2.0-py3-none-any.whl
+```
+
+Après publication de 0.2.0 sur PyPI : `uvx --python 3.13 font-design-mcp@0.2.0 doctor --build`.
+La publication est préparée ; sa disponibilité n’est pas affirmée ici.
+`config --from /chemin/absolu/paquet.whl` imprime la configuration client utilisant ce wheel ;
+`config` seul cible le paquet PyPI versionné. Aucun fichier client n’est modifié.
+Lancez le diagnostic avant de connecter un hôte : le premier appel UV doit télécharger les dépendances.
+
+Priorité du workspace : `--workspace`, puis `FONT_DESIGN_MCP_WORKSPACE`, puis le dossier de données utilisateur :
+`%LOCALAPPDATA%/font-design-mcp/workspace` sous Windows, `~/Library/Application Support/font-design-mcp/workspace`
+sous macOS, `$XDG_DATA_HOME/font-design-mcp/workspace` (ou `~/.local/share/...`) sous Linux.
+Ce dossier reste indépendant du cache UV et survit aux mises à jour et à la suppression de l’extension.
+
+L’[extension MCPB](mcpb/manifest.json) vise les hôtes prenant en charge le runtime UV du manifeste 0.4.
+Voir la [distribution et publication](docs/DISTRIBUTION.md) pour la construction et les limites des tests d’hôtes.
+
+### Développement depuis les sources
+
 1. Clonez le dépôt et installez les dépendances avec les commandes ci-dessous.
 2. Lancez le diagnostic et la démonstration pour générer votre premier spécimen.
 3. [Connectez votre client MCP](#connecter-un-client) pour commencer à créer avec un agent.
@@ -36,7 +62,7 @@ uv run --frozen font-design-mcp doctor
 uv run --frozen python examples/demo.py --workspace ./workspace
 ```
 
-`doctor` vérifie les dépendances installées et rasterise un PNG. Les opérations typographiques sont locales
+`doctor` vérifie les dépendances et rasterise un PNG ; `doctor --build` compile aussi TTF et WOFF2. Les opérations typographiques sont locales
 après installation ; le serveur ne nécessite ni clé API de modèle ni éditeur propriétaire.
 L'agent client peut utiliser un modèle distant.
 
@@ -183,6 +209,7 @@ données structurées, des résumés lisibles, les révisions, les avertissement
 | `project_update` | Modifier le brief, les métadonnées prises en charge, les métriques verticales ou le journal |
 | `glyph_get` | Inspecter contours, IDs, composants, ancres, avance, boîte et approches |
 | `glyph_edit` | Appliquer un lot vectoriel typé et atomique à un glyphe |
+| `font_edit` | Modifier jusqu'à 128 glyphes et leur espacement atomiquement dans une révision |
 | `spacing_edit` | Régler avances, approches, paires et groupes de crénage |
 | `render_glyph` | Rendre un glyphe avec repères, poignées et comparaison de révisions facultatifs |
 | `render_text` | Compiler, composer et rendre un texte à plusieurs tailles |
@@ -192,6 +219,11 @@ données structurées, des résumés lisibles, les révisions, les avertissement
 | `history_restore` | Restaurer un état antérieur dans une nouvelle révision |
 
 [Schémas JSON exacts](docs/tool-schemas.json) · [Référence détaillée des outils](docs/TOOLS.md)
+
+En 0.2.0, l'inspection, la lecture/édition de glyphes, les lots, la validation et les rendus utilisent
+`detail="summary"` par défaut. Demandez `detail="full"` pour les données complètes, notamment les IDs
+des points avant de les modifier ; `render_text` accepte aussi `detail="positions"`. Les images restent
+incluses par défaut ; `image_mode="resource"` renvoie des références à récupérer via les ressources MCP.
 
 ## Sauvegarder et restaurer votre travail
 
@@ -250,7 +282,8 @@ uv build
 ```
 
 Sortie : `dist/`. Les versions des dépendances sont fixées dans `pyproject.toml` et `uv.lock` ;
-`requirements.lock` fournit un export avec hashes pour les installations pip.
+`requirements.lock` fournit les dépendances avec hashes pour pip :
+`pip install --require-hashes -r requirements.lock`, puis `pip install --no-deps /chemin/vers/paquet.whl`.
 
 ### Vérifications
 
@@ -267,9 +300,10 @@ interrompues.
 
 | Vérification | Résultat |
 | --- | --- |
-| **Windows 11 x64, Python 3.11** | 21 tests locaux réussis, dont appels STDIO réels, compilation, rendu, récupération et réglage d'intégration |
+| **Windows 11 x64, Python 3.11** | 36 tests locaux réussis, dont appels STDIO réels, éditions multi-glyphes atomiques, cache de compilation, rendu et récupération |
 | **Runners Windows, macOS et Linux** | [Résultats CI](https://github.com/Kydaix/font-design-mcp/actions/workflows/ci.yml), avec Python 3.11 et 3.13 |
 | **Wheel installé** | Commande d'entrée et démonstration MCP complète testées dans un environnement séparé |
+| **Extension MCPB** | Installée hors dépôt ; diagnostic, appels STDIO et exports TTF/WOFF2 testés |
 
 Le résultat CI couvre les environnements de ses runners, pas toutes les versions d'OS ou architectures CPU.
 Le [rapport de livraison initial](docs/TESTING.md) conserve les résultats locaux antérieurs à la première CI.
@@ -287,7 +321,8 @@ schémas lisibles par les clients.
 | [Architecture](docs/ARCHITECTURE.md) | Domaine, persistance, rendu, compilation, limites et récupération |
 | [Rapport de tests](docs/TESTING.md) | Preuves d'acceptation initiales, captures et revue visuelle restante |
 | [Licences des dépendances](docs/DEPENDENCIES.md) | Dépendances verrouillées et mentions des bibliothèques natives |
-| [Audit initial](docs/AUDIT.md) | Environnement de développement, choix techniques et sources officielles |
+| [Audit technique](docs/audit.md) | Performances, volume des réponses et installation |
+| [Mise en œuvre de l’audit](docs/AUDIT-IMPLEMENTATION.md) | Changements, mesures et vérifications de publication/hôtes restantes |
 
 ## Crédits et licence
 

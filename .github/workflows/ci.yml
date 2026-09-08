@@ -1,5 +1,5 @@
 name: Font pipeline
-on: [push, pull_request, workflow_dispatch]
+on: [push, pull_request, workflow_dispatch, workflow_call]
 permissions:
   contents: read
 jobs:
@@ -22,8 +22,16 @@ jobs:
         with:
           version: '0.12.10'
       - run: uv sync --frozen --python ${{ matrix.python }}
-      - run: uv run --frozen font-design-mcp doctor
+      - run: uv run --frozen font-design-mcp doctor --build
       - run: uv run --frozen ruff check src tests scripts examples
       - run: uv run --frozen pytest -q
+      - name: Legacy SDK client against the current server
+        run: uv run --frozen python -c "import subprocess,sys; subprocess.run(['uv','run','--isolated','--no-project','--with','mcp==1.30.0','python','scripts/legacy_client.py',sys.executable], check=True)"
       - run: uv run --frozen python examples/miette/check.py
       - run: uv build
+      - run: uv run --frozen python scripts/check_distribution.py
+      - run: uv run --frozen python scripts/test_wheel.py
+      - run: uv run --frozen python scripts/build_mcpb.py
+      - run: uv run --frozen python scripts/test_mcpb.py
+      - run: uv run --frozen python scripts/check_registry.py
+      - run: npx --yes @anthropic-ai/mcpb@2.1.2 validate mcpb/manifest.json

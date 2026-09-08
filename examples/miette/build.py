@@ -5,7 +5,6 @@ import asyncio
 import json
 import shutil
 import sys
-from datetime import timedelta
 from pathlib import Path
 
 from drawings import FAMILY, LETTERS, METRICS, glyphs, spacing_operations
@@ -26,13 +25,13 @@ async def build(workspace, output, project_id=None, proof_text=None, only=None):
         args=["-m", "font_design_mcp", "serve", "--workspace", str(workspace)],
     )
     async with stdio_client(parameters) as (read, write):
-        async with ClientSession(read, write, read_timeout_seconds=timedelta(seconds=180)) as session:
+        async with ClientSession(read, write, read_timeout_seconds=180) as session:
             await session.initialize()
 
             async def call(name, **arguments):
                 result = await session.call_tool(name, arguments)
-                data = result.structuredContent
-                if result.isError or not data or not data["ok"]:
+                data = result.structured_content
+                if result.is_error or not data or not data["ok"]:
                     raise RuntimeError(data or result.content)
                 if project_id:
                     with (workspace / project_id / "miette-calls.jsonl").open("a", encoding="utf-8") as log:
@@ -54,18 +53,19 @@ async def build(workspace, output, project_id=None, proof_text=None, only=None):
             existing = set()
             offset = 0
             while True:
-                inventory = await call("project_inspect", project_id=project_id, offset=offset, limit=100)
+                inventory = await call("project_inspect", project_id=project_id, offset=offset, limit=100, detail="full")
                 existing.update(inventory["data"]["glyphs"])
                 offset = inventory["data"]["next_offset"]
                 if offset is None:
                     break
-            for name, drawing in drawings.items():
-                state = await call("glyph_edit", project_id=project_id, expected_revision=revision,
-                                   glyph_id=name, create=name not in existing,
-                                   operations=[{"op": "replace_glyph", "glyph": drawing}],
-                                   summary=f"Miette: original drawing for {name}")
+            changes = [{"glyph_id": name, "create": name not in existing,
+                        "operations": [{"op": "replace_glyph", "glyph": drawing}]}
+                       for name, drawing in drawings.items()]
+            for offset in range(0, len(changes), 128):
+                state = await call("font_edit", project_id=project_id, expected_revision=revision,
+                                   glyphs=changes[offset:offset + 128],
+                                   summary="Miette: original drawings in one transaction")
                 revision = state["revision"]
-                print(f"Drawn {name}", flush=True)
             operations = spacing_operations()
             for offset in range(0, len(operations), 128):
                 state = await call("spacing_edit", project_id=project_id, expected_revision=revision,

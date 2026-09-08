@@ -1,0 +1,29 @@
+{
+  "manifest_version": "0.4",
+  "name": "font-design-mcp",
+  "display_name": "Font Design MCP",
+  "version": "0.2.0",
+  "description": "Draw and refine local UFO fonts, preview glyphs and export TTF/WOFF2.",
+  "author": {"name": "Kydaix"},
+  "repository": {"type": "git", "url": "https://github.com/Kydaix/Font-Design-MCP"},
+  "icon": "icon.png",
+  "server": {
+    "type": "uv",
+    "entry_point": "server.py",
+    "mcp_config": {
+      "command": "uv",
+      "args": ["run", "--directory", "${__dirname}", "--frozen", "--no-dev", "--no-editable", "server.py", "serve", "--workspace", "${user_config.workspace}"]
+    }
+  },
+  "user_config": {
+    "workspace": {
+      "type": "directory",
+      "title": "Font workspace",
+      "description": "Folder authorized for font projects and exports. Kept when the extension is removed.",
+      "required": true
+    }
+  },
+  "compatibility": {"platforms": ["win32", "darwin", "linux"], "runtimes": {"python": ">=3.11 <3.14"}},
+  "keywords": ["fonts", "typography", "ufo", "ttf", "woff2"],
+  "license": "MIT"
+}

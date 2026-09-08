@@ -1,4 +1,4 @@
-"""Official MCP SDK 1.x STDIO transport; stdout contains JSON-RPC only."""
+"""Official MCP SDK 2.x STDIO transport, including legacy protocol clients."""
 
 import base64
 import json
@@ -12,13 +12,16 @@ from mcp.server.lowlevel import Server
 from mcp.server.stdio import stdio_server
 from pydantic import ValidationError
 
+from . import __version__
 from .domain import FontError
 from .models import Result
 from .service import TOOLS, Service
 
 INSTRUCTIONS = """Create and edit Unicode UFO projects using explicit project IDs and expected revisions.
 Coordinates are font units, baseline y=0, Y upwards; advance differs from visible width.
-Read stable IDs before moving points. Use atomic edit batches, render, inspect and revise.
+Read stable IDs with glyph_get(detail=full) before moving points. Prefer font_edit for several glyphs;
+use stroke_path/filled_path/primitive for drawings and point operations for optical corrections.
+Responses default to summaries; request full details or read returned immutable report URIs when needed.
 Define brief/coverage, explore structural glyphs, compare proportions and optical corrections,
 set side bearings before kerning, test words before expanding coverage. Log decisions with project_update.
 Technical validation is not artistic or human approval. Images are provided as MCP image content;
@@ -42,26 +45,67 @@ class BoundedStdin:
 
 def create_server(root):
     service = Service(root)
-    server = Server("font-design-mcp", version="0.1.0", instructions=INSTRUCTIONS)
     limiter = anyio.CapacityLimiter(2)
+    compute_limiter = anyio.CapacityLimiter(1)
 
-    @server.list_tools()
-    async def list_tools():
-        return [
-            types.Tool(
-                name=name,
-                description=description,
-                inputSchema=model.model_json_schema(),
-                outputSchema=Result.model_json_schema(),
-                annotations=types.ToolAnnotations(
-                    readOnlyHint=readonly, destructiveHint=False, idempotentHint=readonly, openWorldHint=False
-                ),
+    def compact_schema(value):
+        if isinstance(value, list):
+            return [compact_schema(item) for item in value]
+        if isinstance(value, dict):
+            return {
+                key: (
+                    {name: compact_schema(schema) for name, schema in item.items()}
+                    if key in ("properties", "$defs")
+                    else compact_schema(item)
+                )
+                for key, item in value.items()
+                if key != "title"
+            }
+        return value
+
+    catalogue = [
+        types.Tool(
+            name=name,
+            description=description,
+            input_schema=compact_schema(model.model_json_schema()),
+            output_schema=compact_schema(Result.model_json_schema()),
+            annotations=types.ToolAnnotations(
+                read_only_hint=readonly,
+                destructive_hint=False,
+                idempotent_hint=readonly,
+                open_world_hint=False,
+            ),
+        )
+        for name, (model, readonly, description) in TOOLS.items()
+    ]
+
+    async def list_tools(ctx, params):
+        return types.ListToolsResult(tools=catalogue)
+
+    async def read_resource(ctx, params):
+        data, mime = await anyio.to_thread.run_sync(service.store.read_resource, params.uri)
+        content = (
+            types.TextResourceContents(uri=params.uri, text=data, mime_type=mime)
+            if isinstance(data, str)
+            else types.BlobResourceContents(
+                uri=params.uri, blob=base64.b64encode(data).decode(), mime_type=mime
             )
-            for name, (model, readonly, description) in TOOLS.items()
-        ]
+        )
+        return types.ReadResourceResult(contents=[content])
 
-    @server.call_tool(validate_input=False)
-    async def call_tool(name, arguments):
+    async def resource_templates(ctx, params):
+        return types.ListResourceTemplatesResult(
+            resource_templates=[
+                types.ResourceTemplate(
+                    uri_template="font-design://{project_id}/{revision}/{artifact_id}/{filename}?sha256={sha256}",
+                    name="Immutable font artifacts",
+                    description="Read the exact report/image URI returned by a tool.",
+                )
+            ]
+        )
+
+    async def call_tool(ctx, params):
+        name, arguments = params.name, params.arguments or {}
         images = []
         try:
             if name not in TOOLS:
@@ -69,8 +113,11 @@ def create_server(root):
             if len(json.dumps(arguments, ensure_ascii=True)) > 2_000_000:
                 raise FontError("limit_exceeded", "Tool input exceeds 2 MB")
             request = TOOLS[name][0].model_validate(arguments)
+            compute = name in {"font_build", "font_validate", "render_text", "render_glyph"}
             result, images = await anyio.to_thread.run_sync(
-                partial(service.execute, name, request), limiter=limiter
+                partial(service.execute, name, request),
+                limiter=compute_limiter if compute else limiter,
+                abandon_on_cancel=compute,
             )
         except ValidationError as exc:
             result = Result(
@@ -78,9 +125,9 @@ def create_server(root):
                 summary="Input or geometry validation failed",
                 error={
                     "code": "invalid_input",
-                    "details": json.loads(
-                        exc.json(include_url=False, include_input=False, include_context=False)
-                    ),
+                    "total": exc.error_count(),
+                    "truncated": exc.error_count() > 5,
+                    "details": exc.errors(include_url=False, include_input=False, include_context=False)[:5],
                 },
             )
         except FontError as exc:
@@ -95,12 +142,30 @@ def create_server(root):
         structured = result.model_dump(mode="json")
         content = [types.TextContent(type="text", text=json.dumps(structured, ensure_ascii=False))]
         content.extend(
-            types.ImageContent(type="image", mimeType="image/png", data=base64.b64encode(p).decode())
+            types.ImageContent(type="image", mime_type="image/png", data=base64.b64encode(p).decode())
             for p in images
         )
-        return types.CallToolResult(isError=not result.ok, structuredContent=structured, content=content)
+        if result.ok and getattr(request, "image_mode", "inline") == "resource":
+            content.extend(
+                types.ResourceLink(
+                    type="resource_link",
+                    uri=info["uri"],
+                    name=f"render-{info['artifact_id']}",
+                    mime_type="image/png",
+                )
+                for info in result.data["images"]
+            )
+        return types.CallToolResult(is_error=not result.ok, structured_content=structured, content=content)
 
-    return server
+    return Server(
+        "font-design-mcp",
+        version=__version__,
+        instructions=INSTRUCTIONS,
+        on_list_tools=list_tools,
+        on_call_tool=call_tool,
+        on_read_resource=read_resource,
+        on_list_resource_templates=resource_templates,
+    )
 
 
 async def serve(root):

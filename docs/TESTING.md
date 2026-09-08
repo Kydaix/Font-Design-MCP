@@ -1,5 +1,18 @@
 # Vérification de livraison — 8 septembre 2026
 
+## Audit 0.2.0
+
+La passe locale actuelle réussit **36 tests en 19,14 s** sur Windows/CPython 3.11.16.
+Elle ajoute transactions multi-glyphes, cache chaud/corrompu, concurrence interprocessus, annulation du
+compilateur, primitives bornées, ressources, réponses compactes et protocole 2026-07-28.
+L'installation du wheel et du MCPB hors dépôt réussit, avec chemins accentués et export TTF/WOFF2.
+Le client SDK 1.30 isolé reste compatible. Voir le [rapport de mise en œuvre](AUDIT-IMPLEMENTATION.md)
+et les [mesures reproductibles](audit-measurements.json) pour les preuves et limites.
+
+## Archives de la livraison 0.1.0
+
+Les résultats et captures ci-dessous décrivent la livraison initiale ; le catalogue actuel compte 14 outils.
+
 ## Exécuté réellement sur Windows 11 x64 / CPython 3.11.16
 
 | Vérification | Résultat |

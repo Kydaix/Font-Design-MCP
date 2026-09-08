@@ -130,7 +130,7 @@ def shape(binary_bytes, text, kern=True):
 
 
 def text_view(binary_path, request, vertical_frame):
-    data = binary_path.read_bytes()
+    data = binary_path if isinstance(binary_path, bytes) else binary_path.read_bytes()
     positions = shape(data, request.text, request.kern)
     top, bottom = vertical_frame
     with TTFont(io.BytesIO(data)) as font:
@@ -139,19 +139,19 @@ def text_view(binary_path, request, vertical_frame):
         order, cmap = font.getGlyphOrder(), font.getBestCmap()
         missing = sorted({ord(ch) for ch in request.text if ord(ch) not in cmap})
         warnings = [f"Missing U+{u:04X}; no system font substitution" for u in missing]
+        pen = FreeTypePen(glyphset)
+        x, y = 0, 0
+        for item in positions:
+            g = glyphset[order[item["gid"]]]
+            g.draw(TransformPen(pen, (1, 0, 0, 1, x + item["x_offset"], y + item["y_offset"])))
+            x += item["x_advance"]
+            y += item["y_advance"]
         rows = []
         for size in request.sizes:
             scale = size / upm
             height = max(48, int((top - bottom) * scale) + 44)
             require(height <= 2048, "limit_exceeded", "Text row exceeds 2048 pixels")
             image = Image.new("RGB", (request.width, height), "black" if request.dark else "white")
-            pen = FreeTypePen(glyphset)
-            x, y = 0, 0
-            for item in positions:
-                g = glyphset[order[item["gid"]]]
-                g.draw(TransformPen(pen, (1, 0, 0, 1, x + item["x_offset"], y + item["y_offset"])))
-                x += item["x_advance"]
-                y += item["y_advance"]
             box = pen.bbox if pen.contours else (0, 0, 0, 0)
             if 20 + box[2] * scale > request.width or 20 + box[0] * scale < 0:
                 warnings.append(f"Specimen clipped horizontally at {size}px; use shorter text or wider image")

@@ -24,8 +24,8 @@ async def demo(workspace):
 
             async def call(name, **arguments):
                 response = await session.call_tool(name, arguments)
-                data = response.structuredContent
-                if response.isError:
+                data = response.structured_content
+                if response.is_error:
                     raise RuntimeError(data or response.content)
                 calls.append({"tool": name, "arguments": arguments, "result": data})
                 return data
@@ -77,7 +77,7 @@ async def demo(workspace):
             )
             validation = await call("font_validate", project_id=pid, revision=revision, corpus="AV OQ Á?")
             build = await call("font_build", project_id=pid, revision=revision)
-            state = await call("project_inspect", project_id=pid)
+            state = await call("project_inspect", project_id=pid, detail="full")
     # Read-only local HTML, no JS, server, network, system font installation or model required.
     cards = []
     for label, result in [

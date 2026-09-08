@@ -4,7 +4,9 @@ import hashlib
 import json
 import os
 import plistlib
+import re
 import stat
+import time
 import uuid
 from contextlib import contextmanager
 from datetime import datetime, timezone
@@ -17,6 +19,7 @@ from ufoLib2 import Font
 
 from .domain import FontError, require, validate_font
 from .models import Revision
+from .telemetry import count, phase
 
 REVISION = TypeAdapter(Revision)
 
@@ -58,11 +61,16 @@ def files_checked(root, folder):
                 yield path
 
 
-def digest_tree(root, folder):
+@phase("source_integrity")
+def digest_tree(root, folder, inspect_ufo=False):
     digest = hashlib.sha256()
     for p in sorted(files_checked(root, folder)):
         rel = p.relative_to(folder).as_posix().encode()
         data = p.read_bytes()
+        count("checked_file_reads")
+        count("checked_bytes_read", len(data))
+        if inspect_ufo:
+            validate_ufo_file(folder, p, data)
         digest.update(len(rel).to_bytes(4, "big") + rel + len(data).to_bytes(8, "big") + data)
     return digest.hexdigest()
 
@@ -90,7 +98,12 @@ def fsync_directory(path):
             os.close(fd)
 
 
+@phase("ufo_safety")
 def validate_ufo_files(root, ufo):
+    return digest_tree(root, ufo, inspect_ufo=True)
+
+
+def validate_ufo_file(ufo, p, data):
     """Reject unsafe XML, paths, alternate layers, images, data and executable lib hooks before UFOReader."""
     allowed_plists = {
         "metainfo.plist",
@@ -102,47 +115,44 @@ def validate_ufo_files(root, ufo):
         "glyphs/contents.plist",
         "glyphs/layerinfo.plist",
     }
-    for p in files_checked(root, ufo):
-        rel = p.relative_to(ufo).as_posix()
+    rel = p.relative_to(ufo).as_posix()
+    require(
+        rel in allowed_plists
+        or rel == "features.fea"
+        or (p.parent == ufo / "glyphs" and p.suffix == ".glif"),
+        "capability_unavailable",
+        f"Unsupported UFO file {rel}",
+    )
+    if p.suffix in (".plist", ".glif"):
+        tree = ElementTree.fromstring(data, forbid_entities=True, forbid_external=True)
+    if p.name == "features.fea":
+        require(not data.strip(), "capability_unavailable", "Raw feature code unsupported")
+    if p.suffix == ".glif":
         require(
-            rel in allowed_plists
-            or rel == "features.fea"
-            or (p.parent == ufo / "glyphs" and p.suffix == ".glif"),
+            tree.find("image") is None and tree.find("lib") is None,
             "capability_unavailable",
-            f"Unsupported UFO file {rel}",
+            "Glyph images and lib entries unsupported",
         )
-        data = p.read_bytes()
-        if p.suffix in (".plist", ".glif"):
-            ElementTree.fromstring(data, forbid_entities=True, forbid_external=True)
-        if p.name == "features.fea":
-            require(not data.strip(), "capability_unavailable", "Raw feature code unsupported")
-        if p.suffix == ".glif":
-            tree = ElementTree.fromstring(data)
+    if p.name == "lib.plist":
+        require(not plistlib.loads(data), "capability_unavailable", "UFO lib hooks unsupported")
+    if p.name == "layercontents.plist":
+        require(
+            plistlib.loads(data) == [["public.default", "glyphs"]],
+            "path_denied",
+            "Only the default glyphs directory is permitted",
+        )
+    if p.name == "contents.plist":
+        for filename in plistlib.loads(data).values():
             require(
-                tree.find("image") is None and tree.find("lib") is None,
-                "capability_unavailable",
-                "Glyph images and lib entries unsupported",
-            )
-        if p.name == "lib.plist":
-            require(not plistlib.loads(data), "capability_unavailable", "UFO lib hooks unsupported")
-        if p.name == "layercontents.plist":
-            require(
-                plistlib.loads(data) == [["public.default", "glyphs"]],
+                isinstance(filename, str)
+                and Path(filename).name == filename
+                and "/" not in filename
+                and "\\" not in filename
+                and ":" not in filename
+                and filename.endswith(".glif"),
                 "path_denied",
-                "Only the default glyphs directory is permitted",
+                "Unsafe GLIF reference",
             )
-        if p.name == "contents.plist":
-            for filename in plistlib.loads(data).values():
-                require(
-                    isinstance(filename, str)
-                    and Path(filename).name == filename
-                    and "/" not in filename
-                    and "\\" not in filename
-                    and ":" not in filename
-                    and filename.endswith(".glif"),
-                    "path_denied",
-                    "Unsafe GLIF reference",
-                )
 
 
 class Store:
@@ -164,13 +174,62 @@ class Store:
         REVISION.validate_python(project_id)
         return safe_path(self.root, self.root / project_id)
 
+    def resource_uri(self, project_id, revision, artifact_id, filename):
+        path = safe_path(self.root, self.project(project_id) / "artifacts" / artifact_id / filename)
+        digest = hashlib.sha256(path.read_bytes()).hexdigest()
+        return f"font-design://{project_id}/{revision}/{artifact_id}/{filename}?sha256={digest}"
+
+    def save_report(self, project_id, revision, report):
+        root = safe_path(self.root, self.project(project_id) / "artifacts")
+        root.mkdir(exist_ok=True)
+        identifier = uuid.uuid4().hex
+        stage = safe_path(self.root, root / (".stage-" + identifier))
+        stage.mkdir()
+        write_json(stage / "artifact.json", {**report, "revision": revision})
+        os.replace(stage, safe_path(self.root, root / identifier))
+        return self.resource_uri(project_id, revision, identifier, "artifact.json")
+
+    def read_resource(self, uri):
+        match = re.fullmatch(
+            r"font-design://([a-f0-9]{32})/([a-f0-9]{32})/([a-f0-9]{32})/"
+            r"(artifact\.json|image\.png|font\.ttf|font\.woff2)\?sha256=([a-f0-9]{64})",
+            str(uri),
+        )
+        require(match is not None, "path_denied", "Invalid artifact URI")
+        project_id, revision, artifact, filename, digest = match.groups()
+        require(
+            any(e["revision"] == revision for e in self.history(project_id)),
+            "missing_reference",
+            "Revision is not committed",
+        )
+        folder = self.project(project_id) / "artifacts" / artifact
+        manifest = read_json(self.root, folder / "artifact.json")
+        require(manifest.get("revision") == revision, "external_modification", "Artifact revision mismatch")
+        path = safe_path(self.root, folder / filename)
+        require(
+            path.is_file() and path.stat().st_size <= 16_000_000,
+            "limit_exceeded",
+            "Resource missing or oversized",
+        )
+        data = path.read_bytes()
+        require(hashlib.sha256(data).hexdigest() == digest, "external_modification", "Resource changed")
+        mime = {
+            "artifact.json": "application/json",
+            "image.png": "image/png",
+            "font.ttf": "font/ttf",
+            "font.woff2": "font/woff2",
+        }[filename]
+        return data.decode("utf-8") if filename == "artifact.json" else data, mime
+
     @contextmanager
     def lock(self, project_id):
         project = self.project(project_id)
         require(project.is_dir(), "missing_reference", "Unknown project")
         lock = FileLock(safe_path(self.root, project / ".lock"), timeout=5)
+        started = time.monotonic()
         try:
             with lock:
+                count("project_lock_wait_us", round((time.monotonic() - started) * 1_000_000))
                 yield project
         except Timeout as exc:
             raise FontError("project_busy", "Project is locked; retry later") from exc
@@ -210,7 +269,9 @@ class Store:
             revision = manifest["parent"]
             expected_hash = manifest["parent_manifest_sha256"]
 
-    def load(self, project_id, revision=None):
+    @phase("verify")
+    def verify(self, project_id, revision=None, inspect_ufo=False):
+        """Verify committed metadata and source bytes without materializing a Font."""
         head = self.head(project_id)
         revision = revision or head["revision"]
         require(
@@ -228,15 +289,21 @@ class Store:
             )
         ufo = folder / "source.ufo"
         require(
-            digest_tree(self.root, ufo) == manifest["source_sha256"],
+            (validate_ufo_files(self.root, ufo) if inspect_ufo else digest_tree(self.root, ufo))
+            == manifest["source_sha256"],
             "external_modification",
             "UFO changed externally; restore your backup before editing",
         )
-        validate_ufo_files(self.root, ufo)
+        return manifest, ufo
+
+    @phase("load")
+    def load(self, project_id, revision=None):
+        manifest, ufo = self.verify(project_id, revision, inspect_ufo=True)
         font = Font.open(ufo, lazy=False, validate=True)
         validate_font(font)
         return font, manifest, ufo
 
+    @phase("commit")
     def commit(self, project_id, font, extra, summary, expected=None):
         """Caller holds project lock. Never overwrite a committed UFO."""
         validate_font(font)
@@ -245,7 +312,7 @@ class Store:
             require(
                 self.head(project_id)["revision"] == expected, "stale_revision", "Expected revision is stale"
             )
-            self.load(project_id)  # Detect external edits before staging.
+            self.verify(project_id)  # Detect external edits before staging.
         revisions = safe_path(self.root, project / "revisions")
         revisions.mkdir(exist_ok=True)
         revision = uuid.uuid4().hex
@@ -254,6 +321,8 @@ class Store:
         ufo = stage / "source.ufo"
         font.save(ufo, formatVersion=3, validate=True)
         for p in files_checked(self.root, ufo):
+            count("source_files_written")
+            count("source_bytes_written", p.stat().st_size)
             with p.open("r+b") as stream:
                 os.fsync(stream.fileno())
         fsync_directory(ufo / "glyphs")
@@ -272,7 +341,8 @@ class Store:
         write_json(stage / "manifest.json", manifest)
         fsync_directory(stage)
         if expected is not None:
-            self.load(project_id)  # Recheck after staging as well.
+            require(self.head(project_id)["revision"] == expected, "stale_revision", "HEAD changed")
+            self.verify(project_id)  # Recheck after staging as well.
         final = safe_path(self.root, revisions / revision)
         os.replace(stage, final)
         fsync_directory(revisions)

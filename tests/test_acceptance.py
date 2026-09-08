@@ -16,7 +16,7 @@ from fontTools.pens.freetypePen import FreeTypePen
 from fontTools.ttLib import TTFont
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
-from mcp.shared.exceptions import McpError
+from mcp.shared.exceptions import MCPError
 from PIL import Image
 from ufoLib2 import Font
 
@@ -39,13 +39,18 @@ async def client(root, fault=None):
 
 
 async def call(session, name, error=None, **args):
+    # This scenario inspects complete evidence; compact defaults have separate coverage.
+    if name in {"project_inspect", "glyph_get", "glyph_edit", "render_glyph", "render_text", "font_validate"}:
+        args.setdefault("detail", "full")
+    if name == "history_list":
+        args.setdefault("include_total", True)
     response = await session.call_tool(name, args)
-    data = response.structuredContent
+    data = response.structured_content
     assert data is not None, response
     if error:
-        assert response.isError and data["error"]["code"] == error, data
+        assert response.is_error and data["error"]["code"] == error, data
     else:
-        assert not response.isError and data["ok"], data
+        assert not response.is_error and data["ok"], data
     return data, response
 
 
@@ -72,12 +77,12 @@ def assert_protocol(root):
 async def scenario(root):
     async with client(root) as session:
         discovery = await session.list_tools()
-        assert len(discovery.tools) == 13
-        assert all(tool.inputSchema and tool.outputSchema for tool in discovery.tools)
-        assert next(t for t in discovery.tools if t.name == "glyph_get").annotations.readOnlyHint
-        assert not next(t for t in discovery.tools if t.name == "render_glyph").annotations.readOnlyHint
+        assert len(discovery.tools) == 14
+        assert all(tool.input_schema and tool.output_schema for tool in discovery.tools)
+        assert next(t for t in discovery.tools if t.name == "glyph_get").annotations.read_only_hint
+        assert not next(t for t in discovery.tools if t.name == "render_glyph").annotations.read_only_hint
         (root / "tool-schemas.json").write_text(
-            json.dumps(discovery.model_dump(mode="json"), indent=2), "utf-8"
+            json.dumps(discovery.model_dump(mode="json", by_alias=True), indent=2), "utf-8"
         )
         created, _ = await call(
             session,
@@ -327,7 +332,7 @@ async def scenario(root):
                 return [leaf for child in error.exceptions for leaf in leaves(child)]
             return [error]
 
-        assert any(isinstance(e, McpError) and "Connection closed" in str(e) for e in leaves(exc)), exc
+        assert any(isinstance(e, MCPError) and "Connection closed" in str(e) for e in leaves(exc)), exc
     async with client(root) as session:
         state, _ = await call(session, "glyph_get", project_id=pid, glyph_id="A")
         assert state["revision"] == restored["revision"] and state["data"] == oldglyph["data"]

@@ -137,8 +137,61 @@ class ReplaceGlyph(Model):
     glyph: Glyph
 
 
+class FilledPath(Model):
+    op: Literal["filled_path"]
+    paths: list[Annotated[str, Field(min_length=1, max_length=16000)]] = Field(min_length=1, max_length=32)
+    id: Annotated[str, Field(pattern=r"^[a-zA-Z_][a-zA-Z0-9_]{0,23}$")] = "outline"
+    replace: bool = False
+    advance: Advance | None = None
+
+
+class StrokePath(FilledPath):
+    op: Literal["stroke_path"]
+    width: Annotated[float, Field(gt=0, le=2000, allow_inf_nan=False)]
+    cap: Literal["round", "butt", "square"] = "round"
+    join: Literal["round", "bevel", "miter"] = "round"
+
+
+class Primitive(Model):
+    op: Literal["primitive"]
+    shape: Literal["rectangle", "ellipse"]
+    x: Coord
+    y: Coord
+    width: Annotated[float, Field(gt=0, le=16000)]
+    height: Annotated[float, Field(gt=0, le=16000)]
+    id: Annotated[str, Field(pattern=r"^[a-zA-Z_][a-zA-Z0-9_]{0,23}$")] = "outline"
+    replace: bool = False
+    advance: Advance | None = None
+
+
+class Duplicate(Model):
+    op: Literal["duplicate"]
+    source: GlyphID
+    matrix: Matrix = IDENTITY
+
+
+class ComposeAccent(Model):
+    op: Literal["compose_accent"]
+    base: GlyphID
+    mark: GlyphID
+    base_anchor: ID = "top"
+    mark_anchor: ID = "_top"
+
+
 Edit = Annotated[
-    PutContour | MovePoint | Transform | PutComponent | PutAnchor | Remove | SetUnicodes | ReplaceGlyph,
+    PutContour
+    | MovePoint
+    | Transform
+    | PutComponent
+    | PutAnchor
+    | Remove
+    | SetUnicodes
+    | ReplaceGlyph
+    | FilledPath
+    | StrokePath
+    | Primitive
+    | Duplicate
+    | ComposeAccent,
     Field(discriminator="op"),
 ]
 
@@ -187,6 +240,8 @@ class ReadRef(ProjectRef):
 
 
 class Page(ReadRef):
+    detail: Literal["summary", "full"] = "summary"
+    include_total: bool = False
     offset: int = Field(default=0, ge=0, le=100000)
     limit: int = Field(default=50, ge=1, le=100)
 
@@ -205,12 +260,31 @@ class ProjectUpdate(WriteRef):
 
 class GlyphGet(ReadRef):
     glyph_id: GlyphID
+    detail: Literal["summary", "full"] = "summary"
 
 
-class GlyphEdit(WriteRef):
+class GlyphChange(Model):
     glyph_id: GlyphID
     create: bool = False
     operations: list[Edit] = Field(min_length=1, max_length=128)
+
+
+class GlyphEdit(WriteRef, GlyphChange):
+    detail: Literal["summary", "full"] = "summary"
+
+
+class FontEdit(WriteRef):
+    glyphs: list[GlyphChange] = Field(min_length=1, max_length=128)
+    spacing: list[Spacing] = Field(default_factory=list, max_length=128)
+    detail: Literal["summary", "full"] = "summary"
+
+    @model_validator(mode="after")
+    def budget(self):
+        if sum(len(g.operations) for g in self.glyphs) + len(self.spacing) > 512:
+            raise ValueError("Maximum 512 operations per transaction")
+        if len({g.glyph_id for g in self.glyphs}) != len(self.glyphs):
+            raise ValueError("Each glyph may appear only once in a transaction")
+        return self
 
 
 class SpacingEdit(WriteRef):
@@ -218,6 +292,7 @@ class SpacingEdit(WriteRef):
 
 
 class RenderGlyph(GlyphGet):
+    image_mode: Literal["inline", "resource"] = "inline"
     compare_revision: Revision | None = None
     width: int = Field(default=640, ge=128, le=1024)
     height: int = Field(default=640, ge=128, le=1024)
@@ -226,6 +301,8 @@ class RenderGlyph(GlyphGet):
 
 
 class RenderText(ReadRef):
+    detail: Literal["summary", "positions", "full"] = "summary"
+    image_mode: Literal["inline", "resource"] = "inline"
     compare_revision: Revision | None = None
     text: str = Field(min_length=1, max_length=256)
     sizes: list[Annotated[int, Field(ge=8, le=160)]] = Field(default=[32, 72], min_length=1, max_length=4)
@@ -235,6 +312,7 @@ class RenderText(ReadRef):
 
 
 class Validate(ReadRef):
+    detail: Literal["summary", "full"] = "summary"
     corpus: str = Field(default="", max_length=4000)
 
 

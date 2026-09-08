@@ -5,15 +5,11 @@ them into editable Bezier outlines; booleanOperations removes overlaps. Both
 libraries already belong to the project's locked environment.
 """
 
-import ctypes
 import unicodedata
 
-import freetype as ft
-from booleanOperations import union
 from fontTools.agl import UV2AGL
-from fontTools.pens.recordingPen import RecordingPen
-from fontTools.svgLib.path import parse_path
-from ufoLib2.objects import Glyph
+
+from font_design_mcp.drawing import path_contours
 
 FAMILY = "Miette"
 METRICS = {"units_per_em": 1000, "ascender": 960, "descender": -260,
@@ -23,78 +19,9 @@ FRENCH = "àâéèêëîïôùûüÿç"
 LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz" + FRENCH + FRENCH.upper() + "æœÆŒ"
 
 
-def outline(path, width=STROKE):
-    """Expand a centre line with FreeType's round caps/joins, retaining curves."""
-    recording = RecordingPen()
-    parse_path(path, recording)
-    stroker = ft.Stroker()
-    stroker.set(round(width * 32), ft.FT_STROKER_LINECAP_ROUND, ft.FT_STROKER_LINEJOIN_ROUND, 0)
-
-    def vector(point):
-        return ctypes.byref(ft.FT_Vector(*(round(v * 64) for v in point)))
-
-    operations = recording.value
-    for index, (operation, points) in enumerate(operations):
-        if operation == "moveTo":
-            end = next(op for op, _ in operations[index + 1:] if op in {"closePath", "endPath"})
-            stroker.begin_subpath(vector(points[0]), end == "endPath")
-        elif operation == "lineTo":
-            stroker.line_to(vector(points[0]))
-        elif operation == "curveTo":
-            stroker.cubic_to(*(vector(point) for point in points))
-        elif operation == "qCurveTo":
-            stroker.conic_to(*(vector(point) for point in points))
-        elif operation in {"closePath", "endPath"}:
-            stroker.end_subpath()
-        else:
-            raise ValueError(operation)
-    point_count, contour_count = stroker.get_counts()
-    assert 0 < point_count < 32768 and 0 < contour_count < 32768
-    vectors = (ft.FT_Vector * point_count)()
-    tags = (ctypes.c_ubyte * point_count)()
-    ends = (ctypes.c_short * contour_count)()
-    raw = ft.FT_Outline(0, 0, vectors, tags, ends, 0)
-    expanded = ft.Outline(raw)
-    stroker.export(expanded)
-    glyph = Glyph()
-    pen = glyph.getPen()
-    started = False
-
-    def xy(point):
-        return point.x / 64, point.y / 64
-
-    def move(point, _):
-        nonlocal started
-        if started:
-            pen.closePath()
-        pen.moveTo(xy(point))
-        started = True
-
-    expanded.decompose(
-        move_to=move,
-        line_to=lambda point, _: pen.lineTo(xy(point)),
-        conic_to=lambda control, point, _: pen.qCurveTo(xy(control), xy(point)),
-        cubic_to=lambda c1, c2, point, _: pen.curveTo(xy(c1), xy(c2), xy(point)),
-    )
-    pen.closePath()
-    return glyph
-
-
 def drawing(name, advance, paths, width=STROKE):
-    contours = [contour for path in paths for contour in outline(path, width)]
-    clean = Glyph()
-    union(contours, clean.getPointPen())
-    return {
-        "advance": advance,
-        "contours": [
-            {"id": f"{name}_c{ci}", "points": [
-                {"id": f"{name}_c{ci}_p{pi}", "x": round(p.x, 3), "y": round(p.y, 3),
-                 "type": p.type or "offcurve", "smooth": p.smooth}
-                for pi, p in enumerate(contour.points)
-            ]}
-            for ci, contour in enumerate(clean)
-        ],
-    }
+    return {"advance": advance,
+            "contours": [c.model_dump() for c in path_contours(paths, name, width)]}
 
 
 def oval(left, bottom, right, top):

@@ -16,6 +16,10 @@ dans `error.code` avec `isError=true`. Une erreur JSON-RPC de méthode/enveloppe
 - Mutation : `project_id`, **`expected_revision`**, `summary` facultatif ≤500 caractères.
 - Pagination : `offset` (défaut 0), `limit` (défaut 50, maximum 100), `next_offset` dans la réponse.
 - Les schémas n'acceptent aucun chemin d'import/export, script, URL, nom de module ou réglage de réseau.
+- `detail="summary"` par défaut pour inspection, lecture/édition de glyphe, lot, validation et rendus.
+  `detail="full"` restitue les détails ; `render_text` accepte aussi `detail="positions"`.
+- `history_list.include_total=true` demande le total exact (parcours complet) ; il est omis sinon.
+- `image_mode="inline"` par défaut pour les rendus ; `"resource"` renvoie seulement les références et métadonnées.
 
 ## Projet et journal
 
@@ -31,8 +35,8 @@ La contrainte est `descender ≤ 0 < x_height ≤ cap_height ≤ ascender` et UP
 `brief` est facultatif, maximum 4000 caractères. Le serveur retourne un nouvel ID de projet et de révision.
 
 `project_open` prend seulement `project_id`. Il rouvre un projet **créé par ce serveur** dans le workspace.
-`project_inspect` ajoute révision et pagination ; renvoie source UFO relative, noms de glyphes, métriques,
-couverture d'inventaire, groupes, paires, brief et décisions. Aucun projet actif n'est mémorisé.
+`project_inspect` renvoie famille, style, UPM, métriques et nombre de glyphes. Avec `detail="full"`,
+il ajoute source UFO relative, inventaire paginé, groupes, paires, brief et décisions. Aucun projet actif n'est mémorisé.
 
 `project_update` prend les paramètres de mutation et des objets facultatifs `metadata`, `metrics`, `brief`,
 `decision`. Les objets metadata/metrics sont complets selon leur schéma et valeurs par défaut, pas des
@@ -45,8 +49,9 @@ ne peut être fourni par un agent. Les assertions en prose ne deviennent pas une
 
 ## Lire et éditer un glyphe
 
-`glyph_get` ajoute `glyph_id` aux paramètres de lecture. `data` contient `advance`, `unicodes`, `contours`,
-`components`, `anchors`, `metrics`. Les bornes géométriques sont `null` pour un glyphe vide.
+`glyph_get` ajoute `glyph_id` aux paramètres de lecture. Le résumé contient identifiant, Unicode et métriques.
+`detail="full"` ajoute `advance`, `contours`, `components` et `anchors`, avec tous les IDs.
+Les bornes géométriques sont `null` pour un glyphe vide.
 
 `glyph_edit` ajoute `glyph_id`, `create=false`, `operations` (1–128 objets à union discriminée par `op`).
 Mettre `create=true` uniquement pour un nouveau glyphe. Un nouveau glyphe sans `replace_glyph` a une avance
@@ -62,6 +67,23 @@ initiale de zéro (valeur UFO) ; régler l'avance avec `spacing_edit` ou le remp
 | `remove` | `kind: contour/component/anchor`, `id` | Supprime explicitement l'élément |
 | `set_unicodes` | `unicodes: [entiers]` | Remplace les associations Unicode du glyphe |
 | `replace_glyph` | `glyph: {advance,unicodes,contours,components,anchors}` | Remplacement global explicite ; l'ancien UFO est conservé |
+| `stroke_path` | `paths`, `width`, `id="outline"`, `cap="round"`, `join="round"`, `replace=false`, `advance` facultative | Développe les lignes centrales en contours et fusionne les overlaps |
+| `filled_path` | `paths`, `id="outline"`, `replace=false`, `advance` facultative | Contours remplis fermés, union nonzero |
+| `primitive` | `shape: rectangle/ellipse`, `x,y,width,height`, `id`, `replace`, `advance` facultative | Primitive en unités de fonte ; ellipse cubique |
+| `duplicate` | `source`, `matrix` facultative | Remplace le glyphe par une copie transformée ; Unicode remis à vide, avance conservée |
+| `compose_accent` | `base`, `mark`, `base_anchor="top"`, `mark_anchor="_top"` | Remplace le dessin par deux composants alignés par ancres ; garde Unicode et prend l'avance de la base |
+
+Les chemins acceptent seulement les commandes absolues explicites `M`, `L`, `Q`, `C`, `Z` et des nombres
+finis dans ±16000. Pas de document SVG, arc, commande relative ou ressource externe. Les chemins remplis
+doivent se fermer avec `Z`. Limites : 32 chemins, 16000 caractères par chemin, 256 segments par chemin,
+512 segments et 8192 points générés par opération ; les limites globales de fonte restent applicables.
+`width` du trait est >0 et ≤2000, `cap` accepte `round/butt/square`, `join` `round/bevel/miter`
+(limite de miter fixée à 4). `replace=true` remplace **tous les contours**, en conservant composants,
+ancres et Unicode. Sans remplacement, les IDs doivent être nouveaux.
+
+Les IDs générés sont `{id}_c{index}` et `{id}_c{index}_p{index}`. Le préfixe est limité à 24 caractères.
+Ils sont déterministes pour le même dessin et moteur, mais leur correspondance n'est pas garantie après
+un changement topologique ou de moteur : relire `glyph_get(detail="full")` avant une correction de point.
 
 Un point est `{id,x,y,type,smooth}` : type `line` par défaut, `offcurve` pour une poignée, `curve` pour
 l'arrivée d'une cubique, `qcurve` pour celle d'une quadratique. `smooth=false` par défaut. Contours fermés,
@@ -99,8 +121,23 @@ Puis `glyph_edit` avec la **nouvelle** révision, `create=false` et :
 {"op": "move_point", "point_id": "apex", "x": 320, "y": 710}
 ```
 
-Les résultats listent `changed` et `data.touched_ids`, `added_ids`, `removed_ids`. Une erreur n'applique
+Le résumé donne `changed` et `data.operation_count`. Avec `detail="full"`, les résultats ajoutent
+`data.touched_ids`, `added_ids`, `removed_ids`. Une erreur n'applique
 aucune partie du lot au projet. Les cycles de composants, y compris indirects, sont bloquants.
+
+## Transaction multi-glyphes
+
+`font_edit` reçoit `project_id`, `expected_revision`, `glyphs` (1–128 objets `{glyph_id, create, operations}`)
+et `spacing` facultatif (opérations de `spacing_edit`). Maximum 512 opérations au total, 128 par glyphe,
+et 2 Mo sur l'enveloppe STDIO. Un glyphe ne peut figurer qu'une fois dans le tableau.
+Les glyphes sont traités dans l'ordre du tableau, puis l'espacement. Les références de composants peuvent
+viser un glyphe créé plus loin dans le lot ; `duplicate` et `compose_accent` utilisent des bases déjà créées.
+Une validation finale et un seul commit publient le lot. Pour `bearings`, une validation supplémentaire
+avant l'espacement protège le parcours du nouveau graphe de composants. Toute erreur annule le lot entier.
+La démonstration Miette utilise cet outil. Les retouches unitaires gardent `glyph_edit`.
+
+Les résumés limitent les diagnostics à dix éléments, avec comptes et indication de troncature.
+Les rapports de ressources et `detail="full"` conservent les listes complètes.
 
 ## Espacement et crénage
 
@@ -128,26 +165,36 @@ Les chiffres exacts et IDs sont dans `glyph_get` ; les images ne remplacent pas 
 
 `render_text` : paramètres de lecture, `text` (1–256 caractères), `sizes=[32,72]` (1–4 tailles, 8–160 px),
 `kern=true`, `width=1000` (128–2048), `dark=false`, `compare_revision` facultatif.
-Un TTF est compilé pour chaque révision. HarfBuzz retourne les IDs/avances/décalages enregistrés dans les
+Un TTF vérifié est réutilisé pour une même clé de compilation. HarfBuzz retourne les IDs/avances/décalages enregistrés dans les
 métadonnées de rendu. Le serveur ne juxtapose pas des caractères en simulant les paires. Les codes absents
 du cmap sont rapportés, sans police système. Les substitutions/normalisations propres à HarfBuzz restent
 celles du moteur de shaping ; la prise en charge générale de marques combinantes n'est pas annoncée.
 
-`data.images` donne pour chaque image sa révision, ID d'artefact, chemin relatif, taille, SHA-256, paramètres,
+Avec `detail="full"`, `data.images` donne pour chaque image sa révision, ID d'artefact, chemin relatif, taille, SHA-256, paramètres,
 moteur et détails. `render_glyph` donne aussi cadre, échelle et origine pixel, ce qui permet des assertions
 sur le remplissage. `render_text` donne `positions`, `missing_codepoints`, `advance_units` et son build TTF.
-Les images sont persistées et également retournées comme contenus image MCP, maximum 2 Mo chacune.
+Le résumé garde dimensions, révision, chemin, URI et avertissements utiles ; `positions` et `build` sont omis.
+`detail="positions"` ajoute seulement les positions. Les images sont persistées et retournées comme contenus
+image MCP, maximum 2 Mo chacune, sauf demande `image_mode="resource"`.
+
+Les URI `font-design://...?...` retournées par les outils se lisent réellement via `resources/read`.
+`uri` donne l'image ; `report_uri` donne son JSON complet. La révision engagée, les identifiants,
+le type de fichier et l'empreinte SHA-256 de l'URI sont vérifiés. Une ressource modifiée est refusée.
+Un hôte doit lire explicitement les ressources ; une URI seule ne fait pas voir une image au modèle.
 
 ## Validation et compilation
 
 `font_validate` : paramètres de lecture, `corpus` facultatif ≤4000 caractères.
-Retour : `data.valid`, `errors`, `observations` (aires/orientations et dépassements verticaux), couverture,
-et build de contrôle. Les absences et l'absence de licence déclarée sont des avertissements.
+Le résumé contient validité, erreurs, couverture, comptes par sévérité, dix premières observations
+actionnables et `report_uri` vers le rapport complet. Les contours d'aire nulle et dépassements verticaux
+sont des avertissements à examiner. `detail="full"` retourne toutes les `observations` et le build de contrôle.
+Les absences et l'absence de licence déclarée sont des avertissements.
 Le rapport ne donne pas de note artistique. Les erreurs de lecture/structure empêchant la validation
 sont des erreurs d'outil ; un compilateur en échec produit un rapport `valid=false`.
 
 `font_build` : paramètres de lecture, `formats=["ttf","woff2"]`. Les seuls formats acceptés sont ces deux-là.
 Retour : `artifact_id`, révision, versions de la chaîne, tables, `files.<format>.{path,sha256,bytes}`.
+`cache_hit` indique la réutilisation d'une compilation et `build_key` son identité.
 Le TTF intermédiaire existe aussi quand seul WOFF2 est demandé. Le moteur conserve les overlaps et utilise
 les conversions officielles ; aucun autohinting. Les sources sont vérifiées inchangées après compilation.
 
@@ -156,6 +203,8 @@ les conversions officielles ; aucun autohinting. Les sources sont vérifiées in
 `history_list` : lecture avec pagination. Avec `revision`, commence l'histoire à cette révision.
 Les entrées donnent révision, parent, date, résumé, restauration éventuelle et hash source, du plus récent
 au plus ancien. Elles ne répètent pas le journal complet de chaque révision.
+Cette lecture certifie la chaîne des manifestes visités, pas les fichiers UFO. La pagination s'arrête
+après la page et une entrée de détection du curseur suivant, sauf demande explicite du total.
 `history_restore` : mutation avec `target_revision`. Crée une nouvelle tête dont le contenu est copié de
 la cible et dont le parent est la tête précédente. Renvoie la nouvelle révision ; jamais un recul destructif de HEAD.
 

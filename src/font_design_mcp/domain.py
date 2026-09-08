@@ -9,6 +9,7 @@ from ufoLib2 import Font
 from ufoLib2.objects import Anchor, Component, Contour, Point
 
 from . import models as m
+from .telemetry import phase
 
 
 class FontError(Exception):
@@ -163,12 +164,29 @@ def edit_glyph(font, request):
     g = font.newGlyph(name) if request.create else font[name]
     before = element_ids(g)
     touched = []
+    points_by_id = None
     for op in request.operations:
+        if isinstance(
+            op,
+            (m.PutContour, m.Remove, m.ReplaceGlyph, m.FilledPath, m.Primitive, m.Duplicate, m.ComposeAccent),
+        ):
+            points_by_id = None
         if isinstance(op, m.PutContour):
             put(g.contours, contour_obj(op.contour), op.replace)
             touched.append(op.contour.id)
         elif isinstance(op, m.MovePoint):
-            p = find([p for c in g.contours for p in c.points], op.point_id)
+            if points_by_id is None:
+                points_by_id = {}
+                for c in g.contours:
+                    for p in c.points:
+                        require(
+                            p.identifier not in points_by_id,
+                            "duplicate_id",
+                            f"Ambiguous element {p.identifier}",
+                        )
+                        points_by_id[p.identifier] = p
+            require(op.point_id in points_by_id, "missing_reference", f"No element {op.point_id}")
+            p = points_by_id[op.point_id]
             p.x, p.y = op.x, op.y
             touched.append(op.point_id)
         elif isinstance(op, m.Transform):
@@ -194,6 +212,54 @@ def edit_glyph(font, request):
         elif isinstance(op, m.ReplaceGlyph):
             replace_glyph(g, op.glyph)
             touched.extend(sorted(element_ids(g)))
+        elif isinstance(op, (m.FilledPath, m.Primitive)):
+            from .drawing import path_contours, primitive_path
+
+            paths = [primitive_path(op)] if isinstance(op, m.Primitive) else op.paths
+            contours = path_contours(
+                paths,
+                op.id,
+                getattr(op, "width", None) if isinstance(op, m.StrokePath) else None,
+                getattr(op, "cap", "round"),
+                getattr(op, "join", "round"),
+            )
+            if op.replace:
+                g.contours.clear()
+            for contour in contours:
+                put(g.contours, contour_obj(contour), False)
+            if op.advance is not None:
+                g.width = op.advance
+            touched.extend(p.id for c in contours for p in c.points)
+        elif isinstance(op, m.Duplicate):
+            require(op.source in font, "missing_reference", f"Missing glyph {op.source}")
+            data = glyph_data(font[op.source])
+            data.unicodes = []  # Unicode cannot be shared by two glyphs.
+            replace_glyph(g, data)
+            transform_glyph(g, op.matrix)
+            touched.extend(sorted(element_ids(g)))
+        elif isinstance(op, m.ComposeAccent):
+            require(
+                op.base in font and op.mark in font and name not in {op.base, op.mark},
+                "missing_reference",
+                "Accent bases must exist and differ from target",
+            )
+            base, mark = font[op.base], font[op.mark]
+            anchors = []
+            for glyph, anchor_name in [(base, op.base_anchor), (mark, op.mark_anchor)]:
+                matches = [a for a in glyph.anchors if a.name == anchor_name]
+                require(len(matches) == 1, "missing_reference", f"Expected one anchor {anchor_name}")
+                anchors.append(matches[0])
+            x, y = anchors[0].x - anchors[1].x, anchors[0].y - anchors[1].y
+            unicodes = list(g.unicodes)
+            g.clear()
+            g.width, g.unicodes = base.width, unicodes
+            g.components.extend(
+                [
+                    Component(op.base, identifier="base"),
+                    Component(op.mark, (1, 0, 0, 1, x, y), identifier="mark"),
+                ]
+            )
+            touched.extend(["base", "mark"])
     return {
         "glyph_id": name,
         "touched_ids": sorted(set(touched)),
@@ -248,6 +314,7 @@ def edit_spacing(font, request):
     return {"touched_ids": touched}
 
 
+@phase("validate")
 def validate_font(font):
     """Blocking geometry/security checks. Overlaps and optical overshoots are not errors."""
     require(len(font) <= 512, "limit_exceeded", "Maximum 512 glyphs")
@@ -313,17 +380,27 @@ def validate_font(font):
             )
     require(total <= 50000, "limit_exceeded", "Maximum 50000 source points")
 
-    # ponytail: bounded DFS per root; memoize if the 512-glyph ceiling is raised.
+    # Per-validation memo only: never reuse results across mutable Font instances.
+    expanded = {}
+
     def visit(name, stack):
         require(name in font, "missing_reference", f"Missing component base {name}")
         require(name not in stack, "component_cycle", f"Component cycle at {name}")
         require(len(stack) < 16, "limit_exceeded", "Component depth exceeds 16")
+        if name in expanded:
+            count, depth = expanded[name]
+            require(len(stack) + depth <= 16, "limit_exceeded", "Component depth exceeds 16")
+            return count, depth
         g = font[name]
         count = 1 + sum(len(c.points) for c in g.contours)
+        depth = 1
         for c in g.components:
-            count += visit(c.baseGlyph, (*stack, name))
-            require(count <= 20000, "limit_exceeded", "Expanded glyph exceeds 20000 points")
-        return count
+            child_count, child_depth = visit(c.baseGlyph, (*stack, name))
+            count += child_count
+            depth = max(depth, child_depth + 1)
+        require(count <= 20000, "limit_exceeded", "Expanded glyph exceeds 20000 points")
+        expanded[name] = count, depth
+        return count, depth
 
     for g in font:
         visit(g.name, ())

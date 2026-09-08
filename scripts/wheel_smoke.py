@@ -10,22 +10,23 @@ from pathlib import Path
 import font_design_mcp
 
 root = Path(__file__).parents[1]
-assert ".venv-wheel" in str(font_design_mcp.__file__), font_design_mcp.__file__
 installed = Path(font_design_mcp.__file__).parent
+assert not installed.resolve().is_relative_to(root / "src"), installed
+assert not Path.cwd().resolve().is_relative_to(root), "Run this smoke test outside the repository"
 for source in (root / "src" / "font_design_mcp").glob("*.py"):
     assert (
         hashlib.sha256(source.read_bytes()).digest()
         == hashlib.sha256((installed / source.name).read_bytes()).digest()
     ), source.name
 entry = Path(sys.executable).parent / ("font-design-mcp.exe" if os.name == "nt" else "font-design-mcp")
-doctor = subprocess.run([str(entry), "doctor"], capture_output=True, text=True, check=True, timeout=20)
+doctor = subprocess.run([str(entry), "doctor", "--build"], capture_output=True, text=True, check=True, timeout=120)
 assert json.loads(doctor.stdout)["png"] == "ok"
 demo = subprocess.run(
     [
         sys.executable,
         str(root / "examples" / "demo.py"),
         "--workspace",
-        str(root / "test-output" / "wheel-smoke"),
+        str(Path.cwd() / "workspace é"),
     ],
     capture_output=True,
     text=True,

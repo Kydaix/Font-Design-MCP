@@ -29,9 +29,9 @@ def test_two_server_processes_cannot_lose_an_update(tmp_path):
                 first.call_tool("project_update", {**args, "brief": "first"}),
                 second.call_tool("project_update", {**args, "brief": "second"}),
             )
-            assert sum(not r.isError for r in responses) == 1
-            failed = next(r for r in responses if r.isError)
-            assert failed.structuredContent["error"]["code"] == "stale_revision"
+            assert sum(not r.is_error for r in responses) == 1
+            failed = next(r for r in responses if r.is_error)
+            assert failed.structured_content["error"]["code"] == "stale_revision"
             history, _ = await call(first, "history_list", project_id=created["project_id"])
             assert history["data"]["total"] == 2
 
