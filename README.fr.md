@@ -20,7 +20,7 @@ Un serveur MCP local pour créer des polices avec un agent IA, du dessin vectori
 
 ## Démarrer
 
-La version **0.4.2** ajoute l'installation directe depuis GitHub, avec détection automatique des clients.
+La version **0.4.3** ajoute l'installation directe depuis GitHub, avec détection automatique des clients.
 Avec **Node.js 20+ et Git**, lancez :
 
 ```sh
@@ -45,11 +45,13 @@ existants du serveur sont conservés. Un fichier invalide est refusé. Relancer 
 l'installation sans créer d'entrée en double.
 Le workspace existant est conservé, sauf changement explicite via `--workspace` ou `FONT_DESIGN_MCP_WORKSPACE`.
 
+Chaque installation crée un runtime séparé : un serveur actif ne bloque plus la mise à jour sous Windows.
+Les anciens runtimes sont conservés pour les clients ouverts et les sauvegardes de configuration.
 Le runtime installé reste utilisable après suppression du cache npm. Retirez son entrée MCP dans un client
 pour le déconnecter. Les projets de polices restent
 dans leur workspace. Le MCP est distribué via GitHub, sans publication sur PyPI ni npm. Les dépendances
 Python restent téléchargées depuis leur index de paquets à la première installation.
-Pour figer une version : `github:Kydaix/Font-Design-MCP#v0.4.2`.
+Pour figer une version : `github:Kydaix/Font-Design-MCP#v0.4.3`.
 
 Pour une configuration manuelle, `font-design-mcp config` imprime du JSON utilisant le wheel de la release
 GitHub ; `config --from /chemin/absolu/paquet.whl` utilise un wheel téléchargé. Ces commandes ne modifient aucun client.

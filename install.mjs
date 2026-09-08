@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // GitHub/npx bootstrap. The Python installer owns client detection and config updates.
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -11,24 +11,24 @@ const options = process.argv.slice(2);
 const windows = process.platform === "win32";
 const suffix = windows ? ".exe" : "";
 const version = JSON.parse(readFileSync(join(root, "package.json"), "utf8")).version;
+const base = windows
+  ? process.env.LOCALAPPDATA || join(homedir(), "AppData", "Local")
+  : process.platform === "darwin"
+    ? join(homedir(), "Library", "Application Support")
+    : process.env.XDG_DATA_HOME || join(homedir(), ".local", "share");
+const data = resolve(base, "font-design-mcp");
 
-function run(command, args, { capture = false, env = process.env, cwd } = {}) {
+function run(command, args, { env = process.env, cwd } = {}) {
   const result = spawnSync(command, args, {
-    stdio: capture ? ["inherit", "pipe", "inherit"] : "inherit",
+    stdio: "inherit",
     encoding: "utf8", env, cwd, windowsHide: true, shell: false,
   });
   if (result.error) throw result.error;
   if (result.status !== 0) throw new Error(`${command} exited with status ${result.status}`);
-  return result.stdout?.trim();
 }
 
 async function findUv() {
-  const base = windows
-    ? process.env.LOCALAPPDATA || join(homedir(), "AppData", "Local")
-    : process.platform === "darwin"
-      ? join(homedir(), "Library", "Application Support")
-      : process.env.XDG_DATA_HOME || join(homedir(), ".local", "share");
-  const bin = resolve(base, "font-design-mcp", "bin");
+  const bin = join(data, "bin");
   const bundled = join(bin, `uv${suffix}`);
   for (const candidate of ["uv", bundled, join(homedir(), ".local", "bin", `uv${suffix}`)]) {
     if (spawnSync(candidate, ["--version"], { stdio: "ignore", windowsHide: true }).status === 0) {
@@ -71,7 +71,7 @@ Usage: npx --yes github:Kydaix/Font-Design-MCP [options]
   --dry-run                          Install runtime, preview client changes only
 
 Without options, detects clients and prompts for your selection.
-Installs Python 3.13 and the MCP in a persistent uv tool environment.
+Installs Python 3.13 and the MCP in a separate persistent environment.
 Existing client files are backed up before changes. No PyPI publication required.`);
     return;
   }
@@ -80,10 +80,15 @@ Existing client files are backed up before changes. No PyPI publication required
   }
   const uv = await findUv();
   console.log(`Installing Font Design MCP ${version} from GitHub sources...`);
-  run(uv, ["tool", "install", "--python", "3.13", "--reinstall-package", "font-design-mcp",
+  const runtimes = join(data, "runtimes");
+  mkdirSync(runtimes, { recursive: true });
+  // ponytail: retain old runtimes for running clients/rollback; add cleanup when disk use warrants it.
+  const runtime = mkdtempSync(join(runtimes, `${version}-`));
+  const python = join(runtime, windows ? "Scripts" : "bin", `python${suffix}`);
+  run(uv, ["venv", "--python", "3.13", runtime]);
+  run(uv, ["pip", "install", "--python", python,
     "--constraints", "requirements.lock", `font-design-mcp @ ${pathToFileURL(root).href}`], { cwd: root });
-  const bin = run(uv, ["tool", "dir", "--bin"], { capture: true });
-  run(join(bin, `font-design-mcp${suffix}`), ["install", ...options]);
+  run(python, ["-m", "font_design_mcp", "install", ...options]);
 }
 
 main().catch(error => {

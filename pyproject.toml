@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "font-design-mcp"
-version = "0.4.2"
+version = "0.4.3"
 description = "Local deterministic UFO font editing over MCP STDIO"
 readme = "README.md"
 license = "MIT"
