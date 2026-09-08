@@ -4,6 +4,7 @@ import asyncio
 import json
 import sys
 import tempfile
+from pathlib import Path
 
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
@@ -12,7 +13,8 @@ from mcp.client.stdio import stdio_client
 async def main():
     with tempfile.TemporaryDirectory(prefix="font-legacy-") as folder:
         params = StdioServerParameters(
-            command=sys.argv[1], args=["-m", "font_design_mcp", "serve", "--workspace", folder]
+            command=sys.argv[1],
+            args=["-m", "font_design_mcp", "serve", "--workspace", str(Path(folder).resolve())],
         )
         async with stdio_client(params) as (read, write), ClientSession(read, write) as session:
             await session.initialize()

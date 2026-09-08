@@ -2,7 +2,10 @@
 
 import asyncio
 import json
+import os
+import subprocess
 import sys
+import tempfile
 from concurrent.futures import ThreadPoolExecutor
 from threading import Event
 
@@ -311,6 +314,36 @@ def test_workspace_priority_and_missing_dependency(tmp_path, monkeypatch):
     monkeypatch.setattr(importlib, "import_module", missing)
     report = doctor()
     assert not report["ok"] and report["errors"][0]["dependency"] == "freetype-py"
+
+
+def test_doctor_build_with_linked_temp_directory(tmp_path, monkeypatch):
+    target = tmp_path / "real-temp"
+    target.mkdir()
+    link = tmp_path / "linked-temp"
+    if os.name == "nt":
+        command = (
+            "New-Item -ItemType Junction -Path '"
+            + str(link).replace("'", "''")
+            + "' -Target '"
+            + str(target).replace("'", "''")
+            + "' | Out-Null"
+        )
+        subprocess.run(["powershell", "-NoProfile", "-Command", command], check=True, capture_output=True)
+    else:
+        link.symlink_to(target, target_is_directory=True)
+    try:
+        monkeypatch.setattr(tempfile, "tempdir", str(link))
+        with pytest.raises(FontError, match="Workspace ancestors"):
+            Service(link / "workspace")
+        report = doctor(build=True)
+        assert report["ok"], report
+        assert set(report["build"]) == {"ttf", "woff2"}
+        assert not list(target.iterdir())
+    finally:
+        if os.name == "nt":
+            os.rmdir(link)
+        else:
+            link.unlink()
 
 
 def test_new_protocol_client(tmp_path):

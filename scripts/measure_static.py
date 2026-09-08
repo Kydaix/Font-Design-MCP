@@ -40,7 +40,7 @@ report = {
 with tempfile.TemporaryDirectory(prefix="font-output-size-") as folder:
     from drawings import METRICS, glyphs
 
-    service = Service(folder)
+    service = Service(Path(folder).resolve())
     created, _ = service.execute(
         "project_create", m.ProjectCreate(metadata=m.Metadata(family="Miette"), metrics=m.Metrics(**METRICS))
     )

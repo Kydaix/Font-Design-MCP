@@ -17,7 +17,7 @@ version = tomllib.loads((root / "pyproject.toml").read_text("utf-8"))["project"]
 
 async def main():
     with tempfile.TemporaryDirectory(prefix="font mcpb é ") as directory:
-        bundle, workspace = Path(directory) / "extension", Path(directory) / "workspace"
+        bundle, workspace = Path(directory).resolve() / "extension", Path(directory).resolve() / "workspace"
         bundle.mkdir()
         with zipfile.ZipFile(root / "dist" / f"font-design-mcp-{version}.mcpb") as archive:
             for name in archive.namelist():

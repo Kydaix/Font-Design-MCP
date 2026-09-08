@@ -30,7 +30,8 @@ async def startup_samples(repeats):
         for index in range(repeats):
             started = time.perf_counter()
             parameters = StdioServerParameters(
-                command=sys.executable, args=["-m", "font_design_mcp", "serve", "--workspace", folder]
+                command=sys.executable,
+                args=["-m", "font_design_mcp", "serve", "--workspace", str(Path(folder).resolve())],
             )
             async with Client(parameters, mode="2026-07-28") as client:
                 catalogue = await client.list_tools()
@@ -72,7 +73,7 @@ def drawings(profile):
 def benchmark(profile, repeats):
     samples = []
     with tempfile.TemporaryDirectory(prefix="font-bench-") as folder:
-        service = Service(folder)
+        service = Service(Path(folder).resolve())
         glyphs, metrics = drawings(profile)
         state, _ = service.execute(
             "project_create", m.ProjectCreate(metadata=m.Metadata(family="Benchmark"), metrics=metrics)

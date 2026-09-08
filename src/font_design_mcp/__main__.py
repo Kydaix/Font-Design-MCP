@@ -71,7 +71,8 @@ def doctor(build=False):
                 from .service import Service
 
                 with tempfile.TemporaryDirectory(prefix="font-design-doctor-") as folder:
-                    service = Service(folder)
+                    # macOS temporary directories may be reached through the system /var symlink.
+                    service = Service(Path(folder).resolve())
                     created, _ = service.execute(
                         "project_create", ProjectCreate(metadata=Metadata(family="Doctor"))
                     )
