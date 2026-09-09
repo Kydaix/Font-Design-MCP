@@ -17,7 +17,17 @@ node, npm = shutil.which("node"), shutil.which("npm")
 assert node and npm, "Node.js 20+ and npm are required to check the npx installer"
 
 
+def documentation_snapshot():
+    """Allow tracked documentation, but detect installer writes to it."""
+    folder = root / "docs"
+    return {
+        path.relative_to(root).as_posix(): path.read_bytes() if path.is_file() else None
+        for path in folder.rglob("*")
+    } if folder.exists() else None
+
+
 async def main():
+    docs_before = documentation_snapshot()
     with tempfile.TemporaryDirectory(prefix="font installer é ") as directory:
         home = Path(directory).resolve()
         packed = subprocess.run(
@@ -112,7 +122,7 @@ async def main():
                 assert len((await new_client.list_tools()).tools) == 18
             assert len((await client.list_tools()).tools) == 18
         assert not (home / "tools").exists()  # Never mutate the shared uv tool installation.
-        assert not (root / "docs").exists()
+        assert documentation_snapshot() == docs_before, "Installer changed repository documentation"
         print(
             "npx package: bootstrap, three clients, live MCP and upgrade with active server passed"
         )
