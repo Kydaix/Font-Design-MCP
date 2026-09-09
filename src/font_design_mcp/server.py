@@ -27,6 +27,15 @@ font_build exports a variable TTF/WOFF2 automatically; render_text(location={"wg
 Responses default to summaries; request full details or read returned immutable report URIs when needed.
 Define brief/coverage, explore structural glyphs, compare proportions and optical corrections,
 set side bearings before kerning, test words before expanding coverage. Log decisions with project_update.
+For hand-drawn work, import PNGs from workspace/inbox with reference_import and explicit image_to_font calibration.
+Do not claim automatic tracing: inspect the reference, preserve distinctive features, reconstruct outlines, then
+compare with render_glyph(reference_id=...). Define required_characters, digit_spacing, metric_rules and stroke_probes
+in project_update(design_spec=...). Keep reference glyphs small until curves and proportions are reviewed.
+Use move_point(preserve_handles=true) for nodes, move_handle for linked cubic controls, and set_smooth for intent.
+Use compose_accent(auto_align=true) to keep accents and advances linked; detach_composition before local overrides.
+After each structural change run font_analyze, render_proof at common scale (including digits), then render_text at
+usage sizes with and without kerning. Correct shared causes, not entire glyphs blindly. Inspect the actual images.
+font_build(require_design_checks=true) gates declared checks across masters, not artistic quality or interpolation.
 Technical validation is not artistic or human approval. Images are provided as MCP image content;
 whether a model sees them depends on the client. No external models, system fonts or network are used."""
 
@@ -116,7 +125,14 @@ def create_server(root):
             if len(json.dumps(arguments, ensure_ascii=True)) > 2_000_000:
                 raise FontError("limit_exceeded", "Tool input exceeds 2 MB")
             request = TOOLS[name][0].model_validate(arguments)
-            compute = name in {"font_build", "font_validate", "render_text", "render_glyph"}
+            compute = name in {
+                "font_build",
+                "font_validate",
+                "font_analyze",
+                "render_text",
+                "render_glyph",
+                "render_proof",
+            }
             result, images = await anyio.to_thread.run_sync(
                 partial(service.execute, name, request),
                 limiter=compute_limiter if compute else limiter,

@@ -101,6 +101,25 @@ class MovePoint(Model):
     point_id: ID
     x: Coord
     y: Coord
+    preserve_handles: bool = False
+
+
+class MoveHandle(Model):
+    op: Literal["move_handle"]
+    point_id: ID
+    x: Coord
+    y: Coord
+    mode: Literal["aligned", "symmetric"] = "aligned"
+
+
+class SetSmooth(Model):
+    op: Literal["set_smooth"]
+    point_id: ID
+    smooth: bool
+
+
+class DetachComposition(Model):
+    op: Literal["detach_composition"]
 
 
 class Transform(Model):
@@ -176,11 +195,15 @@ class ComposeAccent(Model):
     mark: GlyphID
     base_anchor: ID = "top"
     mark_anchor: ID = "_top"
+    auto_align: bool = False
 
 
 Edit = Annotated[
     PutContour
     | MovePoint
+    | MoveHandle
+    | SetSmooth
+    | DetachComposition
     | Transform
     | PutComponent
     | PutAnchor
@@ -281,10 +304,112 @@ class Variation(Model):
         return self
 
 
+class MetricRule(Model):
+    """Explicit equality targets, not inferred rules of beauty. All values are font units."""
+
+    id: ID
+    glyphs: list[GlyphID] = Field(min_length=1, max_length=64)
+    metric: Literal["advance", "visible_width", "height", "left_bearing", "right_bearing"]
+    target: Coord
+    tolerance: Annotated[float, Field(ge=0, le=1000)] = 1
+
+
+class StrokeProbe(Model):
+    """Measure a filled interval on a declared scanline; choose away from junctions."""
+
+    id: ID
+    glyph_id: GlyphID
+    axis: Literal["horizontal", "vertical"] = "horizontal"
+    position: Coord
+    span_index: int = Field(default=0, ge=0, le=63)
+    target: Annotated[float, Field(gt=0, le=4000)]
+    tolerance: Annotated[float, Field(ge=0.5, le=1000)] = 2
+
+
+class DesignSpec(Model):
+    required_characters: ShortText = ""
+    reference_glyphs: list[GlyphID] = Field(default_factory=list, max_length=64)
+    notes: ShortText = ""
+    protected_features: ShortText = ""
+    digit_spacing: Literal["unspecified", "proportional", "tabular"] = "unspecified"
+    digit_tolerance: Annotated[float, Field(ge=0, le=100)] = 0.5
+    tangent_tolerance_degrees: Annotated[float, Field(gt=0, le=30)] = 3
+    metric_rules: list[MetricRule] = Field(default_factory=list, max_length=64)
+    stroke_probes: list[StrokeProbe] = Field(default_factory=list, max_length=128)
+
+    @model_validator(mode="after")
+    def unique_rules(self):
+        ids = [r.id for r in [*self.metric_rules, *self.stroke_probes]]
+        if len(ids) != len(set(ids)):
+            raise ValueError("Design rule IDs must be unique")
+        if any(0xD800 <= ord(ch) <= 0xDFFF for ch in self.required_characters):
+            raise ValueError("Required characters must be Unicode scalars")
+        if len(set(self.reference_glyphs)) != len(self.reference_glyphs):
+            raise ValueError("Reference glyphs must be unique")
+        if any(len(set(r.glyphs)) != len(r.glyphs) for r in self.metric_rules):
+            raise ValueError("Rule glyphs must be unique")
+        return self
+
+
+class AccentLink(Model):
+    base: GlyphID
+    mark: GlyphID
+    base_anchor: ID = "top"
+    mark_anchor: ID = "_top"
+
+
+class DrawingReference(Model):
+    id: ID
+    glyph_id: GlyphID
+    label: Annotated[str, Field(max_length=200)] = ""
+    uri: Annotated[
+        str,
+        Field(
+            pattern=(
+                r"^font-design://[a-f0-9]{32}/[a-f0-9]{32}/[a-f0-9]{32}/image\.png\?sha256=[a-f0-9]{64}$"
+            )
+        ),
+    ]
+    source_sha256: Annotated[str, Field(pattern=r"^[a-f0-9]{64}$")]
+    width: int = Field(ge=1, le=2048)
+    height: int = Field(ge=1, le=2048)
+    image_to_font: Matrix
+    encoded_bytes: int = Field(ge=1, le=2_000_000)
+
+    @model_validator(mode="after")
+    def calibration(self):
+        a, b, c, d, x, y = self.image_to_font
+        if abs(a * d - b * c) <= 1e-8:
+            raise ValueError("Reference calibration must be invertible")
+        for px, py in [(0, 0), (self.width, 0), (0, self.height), (self.width, self.height)]:
+            if abs(a * px + c * py + x) > 16000 or abs(b * px + d * py + y) > 16000:
+                raise ValueError("Calibrated reference exceeds +/-16000 font units")
+        return self
+
+
+class DesignState(Model):
+    version: Literal[1] = 1
+    spec: DesignSpec = Field(default_factory=DesignSpec)
+    references: list[DrawingReference] = Field(default_factory=list, max_length=64)
+    composition_links: Annotated[
+        dict[ID, Annotated[dict[GlyphID, AccentLink], Field(max_length=512)]], Field(max_length=8)
+    ] = Field(default_factory=dict)
+
+    @model_validator(mode="after")
+    def unique_references(self):
+        ids = [r.id for r in self.references]
+        if len(ids) != len(set(ids)):
+            raise ValueError("Drawing reference IDs must be unique")
+        if sum(r.encoded_bytes for r in self.references) > 32_000_000:
+            raise ValueError("Drawing references exceed the 32 MB project budget")
+        return self
+
+
 class ProjectCreate(Model):
     metadata: Metadata
     metrics: Metrics = Field(default_factory=Metrics)
     brief: ShortText = ""
+    design_spec: DesignSpec | None = None
 
 
 class ProjectRef(Model):
@@ -312,6 +437,8 @@ class ProjectUpdate(WriteRef):
     metrics: Metrics | None = None
     brief: ShortText | None = None
     decision: Decision | None = None
+    design_spec: DesignSpec | None = None
+    remove_reference_ids: list[ID] = Field(default_factory=list, max_length=64)
 
 
 class VariableConfigure(WriteRef):
@@ -362,6 +489,42 @@ class RenderGlyph(GlyphGet):
     height: int = Field(default=640, ge=128, le=1024)
     guides: bool = True
     points: bool = True
+    reference_id: ID | None = None
+
+
+class ReferenceImport(WriteRef):
+    reference_id: ID
+    glyph_id: GlyphID
+    source_path: Annotated[str, Field(min_length=1, max_length=512)]
+    image_to_font: Matrix
+    label: Annotated[str, Field(max_length=200)] = ""
+    replace: bool = False
+    image_mode: Literal["inline", "resource"] = "inline"
+
+
+class Analyze(ReadRef):
+    master_id: ID = "default"
+    detail: Literal["summary", "full"] = "summary"
+
+
+class RenderProof(ReadRef):
+    master_id: ID = "default"
+    glyph_ids: list[GlyphID] = Field(min_length=1, max_length=32)
+    compare_revision: Revision | None = None
+    detail: Literal["summary", "full"] = "summary"
+    image_mode: Literal["inline", "resource"] = "inline"
+    columns: int = Field(default=4, ge=1, le=8)
+    cell_width: int = Field(default=256, ge=128, le=512)
+    cell_height: int = Field(default=256, ge=160, le=512)
+    guides: bool = False
+    points: bool = False
+
+    @model_validator(mode="after")
+    def image_budget(self):
+        rows = (len(self.glyph_ids) + self.columns - 1) // self.columns
+        if self.columns * self.cell_width > 2048 or rows * self.cell_height > 2048:
+            raise ValueError("Proof image exceeds 2048 pixels on an axis")
+        return self
 
 
 class RenderText(ReadRef):
@@ -382,6 +545,7 @@ class Validate(ReadRef):
 
 
 class Build(ReadRef):
+    require_design_checks: bool = False
     formats: list[Literal["ttf", "woff2"]] = Field(default=["ttf", "woff2"], min_length=1, max_length=2)
 
 

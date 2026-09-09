@@ -209,6 +209,18 @@ two revisions under the same viewing conditions.
 Technical validation and the agent's judgement are distinct from human approval. The server does not assign
 an artistic score or accept an agent-supplied claim of authenticated human approval.
 
+## Work from your own drawings
+
+Import explicitly calibrated PNG references with `reference_import`, preserve their distinctive features,
+and compare reconstructed outlines with `render_glyph(reference_id=...)`. Use `design_spec` to retain
+coverage and measurable style targets, `font_analyze` to find localized issues, and `render_proof` to compare
+letters **and digits** at a common scale. Handle-preserving edits and optionally linked accents prevent
+some local corrections from breaking related geometry.
+
+This is controlled reconstruction and review, **not automatic tracing or a guarantee of professional quality**.
+See the [reference-driven design workflow](docs/design-workflow.md) for calibration, examples, limits,
+optional export checks and schema-3 compatibility.
+
 ## Available tools
 
 The official MCP SDK publishes input and output schemas through `tools/list`. Responses include structured
@@ -226,6 +238,9 @@ data, readable summaries, revisions, warnings, and identifiable errors.
 | `spacing_edit` | Set advances, side bearings, kerning pairs, and kerning groups |
 | `render_glyph` | Render a glyph with optional guides, handles, and revision comparison |
 | `render_text` | Compile, shape, and render text at multiple sizes |
+| `reference_import` | Import a calibrated PNG from workspace/inbox as an immutable drawing reference |
+| `font_analyze` | Check declared smooth joins, coverage, digit spacing and explicit design targets |
+| `render_proof` | Compare multiple glyphs at a shared scale, optionally across revisions |
 | `font_validate` | Check geometry, Unicode coverage, compilation, and OpenType tables |
 | `font_build` | Export static or variable TTF and/or WOFF2 from a frozen revision |
 | `variable_configure` | Define continuous axes and clone/edit the project's master configuration |
@@ -241,7 +256,9 @@ Inspection, glyph reads/edits, batch edits, validation, and renders default to
 
 ## Save and restore your work
 
-UFO 3 is the authoritative typography source. Fonts and images are derived artifacts tied to a revision:
+UFO 3 is authoritative for outlines. Design contracts and links are revisioned in the manifest.
+Compiled fonts and preview images are derived artifacts; **imported drawing references are project inputs**
+and their referenced `artifacts/` entries must be retained and backed up with the project:
 
 ```text
 workspace/<project_id>/

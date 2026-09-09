@@ -154,7 +154,7 @@ def element_ids(g):
     }
 
 
-def edit_glyph(font, request):
+def edit_glyph(font, request, composition_links=None):
     name = request.glyph_id
     require(
         (name not in font) == request.create,
@@ -166,6 +166,39 @@ def edit_glyph(font, request):
     touched = []
     points_by_id = None
     for op in request.operations:
+        if composition_links is not None and name in composition_links:
+            require(
+                isinstance(op, (m.DetachComposition, m.ComposeAccent, m.SetUnicodes, m.PutAnchor)),
+                "linked_composition",
+                f"Detach linked composition {name} before editing its outline",
+            )
+        if isinstance(op, m.DetachComposition):
+            require(
+                composition_links is not None and name in composition_links,
+                "missing_reference",
+                f"No linked composition {name}",
+            )
+            del composition_links[name]
+            touched.append("composition_link")
+        elif isinstance(op, (m.MoveHandle, m.SetSmooth)) or (
+            isinstance(op, m.MovePoint) and op.preserve_handles
+        ):
+            from .geometry import move_handle, move_node, point_context
+
+            try:
+                if isinstance(op, m.MoveHandle):
+                    touched.extend(move_handle(g, op.point_id, op.x, op.y, op.mode))
+                elif isinstance(op, m.SetSmooth):
+                    contour, index = point_context(g, op.point_id)
+                    point = contour.points[index]
+                    require(point.type is not None, "invalid_geometry", "Only on-curve nodes can be smooth")
+                    point.smooth = op.smooth
+                    touched.append(op.point_id)
+                else:
+                    touched.extend(move_node(g, op.point_id, op.x, op.y))
+            except ValueError as exc:
+                raise FontError("invalid_geometry", str(exc)) from exc
+            continue
         if isinstance(
             op,
             (m.PutContour, m.Remove, m.ReplaceGlyph, m.FilledPath, m.Primitive, m.Duplicate, m.ComposeAccent),
@@ -260,6 +293,17 @@ def edit_glyph(font, request):
                 ]
             )
             touched.extend(["base", "mark"])
+            if composition_links is not None:
+                composition_links.pop(name, None)
+            if op.auto_align:
+                require(
+                    composition_links is not None,
+                    "capability_unavailable",
+                    "Linked composition needs project state",
+                )
+                composition_links[name] = m.AccentLink(
+                    base=op.base, mark=op.mark, base_anchor=op.base_anchor, mark_anchor=op.mark_anchor
+                )
     return {
         "glyph_id": name,
         "touched_ids": sorted(set(touched)),
@@ -282,10 +326,15 @@ def transform_glyph(g, matrix, contour_ids=None):
             a.x, a.y = t.transformPoint((a.x, a.y))
 
 
-def edit_spacing(font, request):
+def edit_spacing(font, request, composition_links=None):
     touched = []
     for op in request.operations:
         if isinstance(op, (m.SetAdvance, m.Bearings)):
+            require(
+                not composition_links or op.glyph_id not in composition_links,
+                "linked_composition",
+                f"Detach linked composition {op.glyph_id} before changing its metrics",
+            )
             require(op.glyph_id in font, "missing_reference", f"Missing glyph {op.glyph_id}")
             g = font[op.glyph_id]
             if isinstance(op, m.SetAdvance):
@@ -311,7 +360,11 @@ def edit_spacing(font, request):
             else:
                 font.kerning[pair] = op.value
             touched.append(f"{op.left}/{op.right}")
-    return {"touched_ids": touched}
+        if composition_links and isinstance(op, (m.SetAdvance, m.Bearings)):
+            from .design import refresh_compositions
+
+            touched.extend(refresh_compositions(font, composition_links))
+    return {"touched_ids": list(dict.fromkeys(touched))}
 
 
 @phase("validate")

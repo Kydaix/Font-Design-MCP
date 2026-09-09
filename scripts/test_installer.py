@@ -97,7 +97,7 @@ async def main():
         assert "runtimes" in Path(server["command"]).parts
         assert not Path(server["command"]).is_relative_to(home / "package")
         async with Client(StdioServerParameters(command=server["command"], args=server["args"])) as client:
-            assert len((await client.list_tools()).tools) == 15
+            assert len((await client.list_tools()).tools) == 18
             # Keep the previous interpreter running: Windows forbids replacing its directory.
             result = await asyncio.to_thread(
                 subprocess.run, command, env=env, capture_output=True, text=True, timeout=360
@@ -109,8 +109,8 @@ async def main():
             async with Client(StdioServerParameters(
                 command=replacement["command"], args=replacement["args"]
             )) as new_client:
-                assert len((await new_client.list_tools()).tools) == 15
-            assert len((await client.list_tools()).tools) == 15
+                assert len((await new_client.list_tools()).tools) == 18
+            assert len((await client.list_tools()).tools) == 18
         assert not (home / "tools").exists()  # Never mutate the shared uv tool installation.
         assert not (root / "docs").exists()
         print(
