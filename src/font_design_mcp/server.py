@@ -38,7 +38,18 @@ usage sizes with and without kerning. Correct shared causes, not entire glyphs b
 Metric/stroke rules accept master_id or location (mutually exclusive); unscoped rules apply to every master.
 Declare variation_probes for stroke progression with axis_tag, ordered values, direction and optional minimum_change.
 font_analyze compiles location/variation checks and reports unmarked curve joins as review candidates, not errors.
-font_build(require_design_checks=true) gates declared checks across masters and sampled locations, not artistic quality.
+Default analysis checks visible ink, matching outlines and self crossings; review candidates carry stable finding IDs.
+Use stroke_profiles with start/end centerlines, minimum/maximum normal widths and max_ratio for diagonals and counters.
+render_glyph(measurements=true) overlays profile samples; inspect them before changing rules or outlines.
+Include K/M/N/V/W/Y/R/k/m/y and digits in structural exploration; uniform stroke_path outlines help preserve branch widths.
+Do not expand accents until structural glyphs and shaped words are convincing. Probe each structural reference glyph.
+font_build defaults to purpose=proof. require_design_checks=true gates default and declared checks, not visual review.
+After viewing actual renders, record proof_review with exact revision and render report_uris; use verdict=revise for defects.
+Resolve intentional candidates with finding_id and a specific reason; repair unintended defects and render again.
+font_release_check reports missing evidence. For purpose=release, supply review_uris from proof_review:
+every visible glyph/master, structural measurements, reference overlays and text at <=32 and >=48 px with kern true/false.
+Variable releases also need intermediate-axis text reviews. Every edit invalidates prior revision evidence.
+Never call a proof export a reviewed release; successful release checks are still not human or artistic approval.
 Technical validation is not artistic or human approval. Images are provided as MCP image content;
 whether a model sees them depends on the client. No external models, system fonts or network are used."""
 
@@ -132,6 +143,7 @@ def create_server(root):
                 "font_build",
                 "font_validate",
                 "font_analyze",
+                "font_release_check",
                 "render_text",
                 "render_glyph",
                 "render_proof",

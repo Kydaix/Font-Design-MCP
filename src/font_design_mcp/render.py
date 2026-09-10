@@ -14,6 +14,8 @@ from fontTools.ttLib import TTFont
 from PIL import Image, ImageChops, ImageDraw, ImageFilter
 
 from .domain import metrics, require
+from .geometry import FlattenPen
+from .quality import measure_profile
 from .storage import safe_path, write_json
 
 ENGINE = (
@@ -21,7 +23,7 @@ ENGINE = (
 )
 
 
-def glyph_view(font, name, request, frame, reference=None):
+def glyph_view(font, name, request, frame, reference=None, profiles=()):
     g = font[name]
     xmin, ymin, xmax, ymax = frame
     w, h = request.width, request.height
@@ -80,12 +82,29 @@ def glyph_view(font, name, request, frame, reference=None):
             draw.line((x - 5, y, x + 5, y), fill="black")
             draw.line((x, y - 5, x, y + 5), fill="black")
             draw.text((x + 7, y), a.name, fill="black")
+    measurements = []
+    if getattr(request, "measurements", False) and profiles:
+        tolerance = min(0.25, font.info.unitsPerEm / 4000)
+        flattened = FlattenPen(font, tolerance=tolerance)
+        g.draw(flattened)
+        for profile in profiles:
+            row = measure_profile(flattened.contours, profile, tolerance)
+            measurements.append(row)
+            for sample in row["samples"]:
+                color = (30, 120, 160) if sample["within_range"] and row["checks_passed"] else (210, 55, 45)
+                if sample["endpoints"]:
+                    draw.line([xy(*p) for p in sample["endpoints"]], fill=color, width=2)
+                x, y = xy(*sample["center"])
+                draw.ellipse((x - 2, y - 2, x + 2, y + 2), fill=color)
+                label = f"{sample['actual']:.1f}" if sample["actual"] is not None else "missing"
+                draw.text((x + 4, y + 2), label, fill=color, stroke_width=1, stroke_fill="white")
     return image, {
         "metrics": metrics(g, font),
         "frame": frame,
         "scale": scale,
         "origin_pixel": xy(0, 0),
         "component_points": "Inspect base glyph for component controls",
+        "profile_measurements": measurements,
     }
 
 

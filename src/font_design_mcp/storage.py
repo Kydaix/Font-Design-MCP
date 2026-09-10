@@ -254,15 +254,17 @@ class Store:
         require(
             manifest.get("revision") == revision
             and manifest.get("project_id") == project_id
-            and manifest.get("schema") in (1, 2, 3),
+            and manifest.get("schema") in (1, 2, 3, 4),
             "external_modification",
             "Invalid revision manifest",
         )
         if "design" in manifest:
-            require(
-                manifest["schema"] == 3, "external_modification", "Design state requires manifest schema 3"
-            )
             state = DesignState.model_validate(manifest["design"])
+            require(
+                manifest["schema"] == (4 if state.version == 2 else 3),
+                "external_modification",
+                "Design state/manifest schema mismatch",
+            )
             require(
                 all(r.uri.startswith(f"font-design://{project_id}/") for r in state.references),
                 "path_denied",
@@ -359,6 +361,7 @@ class Store:
         project = self.project(project_id)
         if "design" in extra:
             state = DesignState.model_validate(extra["design"])
+            extra = {**extra, "design": state.model_dump()}
             require(
                 set(state.composition_links) <= set(masters or {"default": font}),
                 "missing_reference",
@@ -411,7 +414,11 @@ class Store:
         fsync_directory(ufo / "glyphs")
         fsync_directory(ufo)
         manifest = {
-            "schema": 3 if "design" in extra else 2 if "variation" in extra else 1,
+            "schema": (4 if extra["design"]["version"] == 2 else 3)
+            if "design" in extra
+            else 2
+            if "variation" in extra
+            else 1,
             "project_id": project_id,
             "revision": revision,
             "parent": expected,

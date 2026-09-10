@@ -187,6 +187,10 @@ The client agent makes the creative decisions; the server applies validated oper
 
 Record hypotheses and observed corrections in the project's decision journal.
 
+The development version adds default outline diagnostics, perpendicular stroke/counter profiles and
+revision-bound visual reviews. `font_build` defaults to a proof export; `purpose="release"` requires an
+explicit review contract. See the [quality and release workflow](docs/quality-release.md).
+
 <details>
 <summary>Example: move a point and compare revisions</summary>
 
@@ -241,7 +245,9 @@ data, readable summaries, revisions, warnings, and identifiable errors.
 | `render_glyph` | Render a glyph with optional guides, handles, and revision comparison |
 | `render_text` | Compile, shape, and render text at multiple sizes |
 | `reference_import` | Import a calibrated PNG from workspace/inbox as an immutable drawing reference |
-| `font_analyze` | Check declared smooth joins, coverage, digit spacing and explicit design targets |
+| `font_analyze` | Check visible ink, matching outlines, crossings, design coverage and declared metrics/profiles |
+| `proof_review` | Record an agent assessment of immutable proofs and intentional localized findings |
+| `font_release_check` | Report missing measurements, glyph/text reviews and unresolved findings across masters |
 | `render_proof` | Compare multiple glyphs at a shared scale, optionally across revisions |
 | `font_validate` | Check geometry, Unicode coverage, compilation, and OpenType tables |
 | `font_build` | Export static or variable TTF and/or WOFF2 from a frozen revision |

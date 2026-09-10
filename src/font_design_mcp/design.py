@@ -3,6 +3,7 @@
 from . import models as m
 from .domain import metrics, require
 from .geometry import FlattenPen, filled_spans, join_issues
+from .quality import finding_id, measure_profile, outline_findings
 
 
 def design_state(manifest):
@@ -15,7 +16,7 @@ def applies_to_master(rule, master_id):
 
 def needs_variation(spec):
     return bool(spec.variation_probes) or any(
-        r.location is not None for r in [*spec.metric_rules, *spec.stroke_probes]
+        r.location is not None for r in [*spec.metric_rules, *spec.stroke_probes, *spec.stroke_profiles]
     )
 
 
@@ -37,7 +38,7 @@ def validate_rule_scopes(spec, manifest):
             "Design rule location has an unknown axis or is outside its range",
         )
 
-    for rule in [*spec.metric_rules, *spec.stroke_probes]:
+    for rule in [*spec.metric_rules, *spec.stroke_probes, *spec.stroke_profiles]:
         require(
             rule.master_id is None or rule.master_id in masters,
             "invalid_input",
@@ -87,6 +88,14 @@ def analyze_font(font, spec, master_id="default"):
     )
     measurements = []
     candidates = IssueBuffer()
+    outline_scope = {}
+    outline_errors = 0
+    for blocking, finding in outline_findings(font, outline_scope):
+        if blocking:
+            issues.append(finding)
+            outline_errors += 1
+        else:
+            candidates.append(finding)
     smooth_count = 0
     for name in spec.reference_glyphs:
         if name not in font:
@@ -103,6 +112,7 @@ def analyze_font(font, spec, master_id="default"):
         smooth_count += sum(p.type is not None and p.smooth for c in glyph.contours for p in c.points)
     metric_rules = [r for r in spec.metric_rules if applies_to_master(r, master_id)]
     stroke_probes = [r for r in spec.stroke_probes if applies_to_master(r, master_id)]
+    stroke_profiles = [r for r in spec.stroke_profiles if applies_to_master(r, master_id)]
     if spec.digit_spacing == "tabular":
         digits = [(cmap[u], font[cmap[u]].width) for u in range(48, 58) if u in cmap]
         if digits:
@@ -168,10 +178,9 @@ def analyze_font(font, spec, master_id="default"):
     flattened_points = 0
     # Raster-like diagnostics need not change source curves. Error is declared, never hidden.
     tolerance = min(0.25, font.info.unitsPerEm / 4000)
-    for probe in stroke_probes:
-        name = probe.glyph_id
-        if missing_glyph(name, probe.id):
-            continue
+
+    def contours_for(name):
+        nonlocal flattened_points
         if name not in flattened:
             pen = FlattenPen(font, tolerance=tolerance, budget=min(20000, max(1, 200000 - flattened_points)))
             try:
@@ -182,7 +191,13 @@ def analyze_font(font, spec, master_id="default"):
             except ValueError as exc:
                 flattened[name] = str(exc)
             flattened_points += pen.count
-        contours = flattened[name]
+        return flattened[name]
+
+    for probe in stroke_probes:
+        name = probe.glyph_id
+        if missing_glyph(name, probe.id):
+            continue
+        contours = contours_for(name)
         if isinstance(contours, str):
             issues.append(
                 {"kind": "diagnostic_limit", "glyph": name, "rule_id": probe.id, "message": contours}
@@ -208,12 +223,73 @@ def analyze_font(font, spec, master_id="default"):
             spans_truncated=len(spans) > 64,
             flatten_tolerance=tolerance,
         )
+    for profile in stroke_profiles:
+        if missing_glyph(profile.glyph_id, profile.id):
+            continue
+        contours = contours_for(profile.glyph_id)
+        try:
+            if isinstance(contours, str):
+                raise ValueError(contours)
+            row = measure_profile(contours, profile, tolerance)
+            measurements.append(row)
+            if not row["checks_passed"]:
+                issues.append(
+                    {
+                        **row,
+                        "kind": "stroke_profile_mismatch",
+                        "message": "Normal widths or variation exceed the declared profile; inspect sample endpoints",
+                    }
+                )
+        except ValueError as exc:
+            issues.append(
+                {
+                    "kind": "diagnostic_limit",
+                    "glyph": profile.glyph_id,
+                    "rule_id": profile.id,
+                    "message": str(exc),
+                }
+            )
+    for row in candidates.items:
+        row["finding_id"] = finding_id(row, master_id)
+    measured = sorted({row["glyph"] for row in measurements if "glyph" in row})
+    shape_measured = sorted(
+        {row["glyph"] for row in measurements if row["kind"] in {"stroke_probe", "stroke_profile"}}
+    )
+    unprobed_references = sorted(set(spec.reference_glyphs) - set(shape_measured))
+    structural = sorted(
+        set(spec.reference_glyphs)
+        | {cmap[ord(c)] for c in "HOnosaASUKMNVRWXYkmy0123456789" if ord(c) in cmap}
+    )
     return {
         "review": "automatic",
         "artistic_approval": False,
         "reference_fidelity": "not_assessed",
         "checks_passed": not issues,
         "coverage_complete": not missing,
+        "outline_integrity_passed": outline_errors == 0 and outline_scope["complete"],
+        "design_coverage": {
+            "measured_glyphs": measured,
+            "shape_measured_glyphs": shape_measured,
+            "unprobed_reference_glyphs": unprobed_references,
+            "structural_glyphs": structural,
+            "unprobed_structural_glyphs": sorted(set(structural) - set(shape_measured)),
+            "visual_review": "not_recorded_by_analysis",
+        },
+        "next_steps": [
+            *(["Repair blocking findings, then rerun font_analyze."] if issues else []),
+            *(
+                ["Inspect localized review candidates; record intentional choices with proof_review."]
+                if candidates
+                else []
+            ),
+            *(
+                ["Add stroke probes/profiles for structural glyphs: " + ", ".join(unprobed_references)]
+                if unprobed_references
+                else []
+            ),
+            "Render structural glyphs and shaped text at usage sizes before expanding coverage.",
+            "Use font_release_check for revision-bound review coverage; analysis alone is not release approval.",
+        ],
         "missing_codepoints": missing,
         "issues": issues.items,
         "issues_truncated": len(issues.items) < len(issues),
@@ -230,9 +306,11 @@ def analyze_font(font, spec, master_id="default"):
             "smooth_joins_checked": smooth_count,
             "metric_rules_checked": len(metric_rules),
             "stroke_probes_checked": len(stroke_probes),
+            "stroke_profiles_checked": len(stroke_profiles),
+            "outline_integrity": outline_scope,
             "rules_for_other_masters": sum(
                 r.master_id is not None and r.master_id != master_id
-                for r in [*spec.metric_rules, *spec.stroke_probes]
+                for r in [*spec.metric_rules, *spec.stroke_probes, *spec.stroke_profiles]
             ),
             "variation": "pending" if needs_variation(spec) else "not_requested",
             "not_assessed": [
@@ -244,7 +322,7 @@ def analyze_font(font, spec, master_id="default"):
         },
         "limitations": [
             "Passing checks is not professional or human approval.",
-            "Only declared smooth joins, coverage and explicit metric/probe rules are checked.",
+            "Default outline checks supplement declared smooth joins, coverage and explicit metric/profile rules.",
             "Stroke probes use bounded polyline approximation; choose scanlines away from joins and extrema.",
             "No automatic tracing, style inference, G2 continuity or self-intersection certification.",
         ],

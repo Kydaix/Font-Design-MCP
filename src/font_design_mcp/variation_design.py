@@ -8,6 +8,7 @@ from fontTools.ttLib import TTFont
 from .build import check_cancelled
 from .design import IssueBuffer
 from .geometry import FlattenPen, filled_spans
+from .quality import measure_profile
 
 
 def analyze_variation(binary_bytes, spec):
@@ -56,6 +57,9 @@ def analyze_variation(binary_bytes, spec):
                         glyph.draw(pen)
                     finally:
                         point_count += pen.count
+                    if hasattr(rule, "region"):
+                        row.update(measure_profile(pen.contours, rule, tolerance))
+                        return row
                     spans = filled_spans(pen.contours, rule.axis, rule.position)
                     span = spans[rule.span_index] if rule.span_index < len(spans) else None
                     row.update(
@@ -75,13 +79,24 @@ def analyze_variation(binary_bytes, spec):
                 issues.append({**row, "kind": "diagnostic_limit", "message": str(exc)})
             return row
 
-        for rule in [*spec.metric_rules, *spec.stroke_probes]:
+        for rule in [*spec.metric_rules, *spec.stroke_probes, *spec.stroke_profiles]:
             if rule.location is None:
                 continue
             metric = getattr(rule, "metric", None)
             names = rule.glyphs if metric else [rule.glyph_id]
             for name in names:
                 row = evaluate(rule, rule.location, metric, name)
+                if hasattr(rule, "region"):
+                    measurements.append(row)
+                    if not row.get("checks_passed", False):
+                        issues.append(
+                            {
+                                **row,
+                                "kind": "stroke_profile_mismatch",
+                                "message": "Exported normal widths exceed the declared profile",
+                            }
+                        )
+                    continue
                 row.update(target=rule.target, tolerance=rule.tolerance)
                 measurements.append(row)
                 if row["actual"] is not None and abs(row["actual"] - rule.target) > rule.tolerance:

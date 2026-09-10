@@ -5,6 +5,10 @@ style automatically, or certify professional/artistically perfect typography. Th
 receive and inspect the returned images. Preserve distinctive features rather than regularizing every
 intentional asymmetry.
 
+The development version extends this workflow with [default diagnostics, normal-width profiles and
+release evidence](quality-release.md). Profiles use manifest schema 4; existing projects remain readable.
+Visual review records reference an exact revision without changing its sources.
+
 ## 1. Define a small, testable design contract
 
 `project_create` and `project_update` accept `design_spec`. Updating it replaces the **whole** spec;
