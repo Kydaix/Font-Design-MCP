@@ -304,7 +304,18 @@ class Variation(Model):
         return self
 
 
-class MetricRule(Model):
+class RuleScope(Model):
+    master_id: ID | None = None
+    location: Location | None = None
+
+    @model_validator(mode="after")
+    def exclusive_scope(self):
+        if self.master_id is not None and self.location is not None:
+            raise ValueError("Choose master_id or location, not both")
+        return self
+
+
+class MetricRule(RuleScope):
     """Explicit equality targets, not inferred rules of beauty. All values are font units."""
 
     id: ID
@@ -314,7 +325,7 @@ class MetricRule(Model):
     tolerance: Annotated[float, Field(ge=0, le=1000)] = 1
 
 
-class StrokeProbe(Model):
+class StrokeProbe(RuleScope):
     """Measure a filled interval on a declared scanline; choose away from junctions."""
 
     id: ID
@@ -324,6 +335,30 @@ class StrokeProbe(Model):
     span_index: int = Field(default=0, ge=0, le=63)
     target: Annotated[float, Field(gt=0, le=4000)]
     tolerance: Annotated[float, Field(ge=0.5, le=1000)] = 2
+
+
+class VariationProbe(Model):
+    """Sample a declared stroke across an axis; this is not an optical weight estimate."""
+
+    id: ID
+    glyph_id: GlyphID
+    axis: Literal["horizontal", "vertical"] = "horizontal"
+    position: Coord
+    span_index: int = Field(default=0, ge=0, le=63)
+    axis_tag: AxisTag
+    values: list[AxisValue] = Field(min_length=2, max_length=9)
+    location: Location = Field(default_factory=dict)
+    direction: Literal["nondecreasing", "nonincreasing"] = "nondecreasing"
+    tolerance: Annotated[float, Field(ge=0.5, le=1000)] = 2
+    minimum_change: Annotated[float, Field(ge=0, le=4000)] = 0
+
+    @model_validator(mode="after")
+    def ordered_samples(self):
+        if any(a >= b for a, b in zip(self.values, self.values[1:])):
+            raise ValueError("Variation sample values must be strictly increasing")
+        if self.axis_tag in self.location:
+            raise ValueError("The sampled axis must not also appear in location")
+        return self
 
 
 class DesignSpec(Model):
@@ -336,10 +371,11 @@ class DesignSpec(Model):
     tangent_tolerance_degrees: Annotated[float, Field(gt=0, le=30)] = 3
     metric_rules: list[MetricRule] = Field(default_factory=list, max_length=64)
     stroke_probes: list[StrokeProbe] = Field(default_factory=list, max_length=128)
+    variation_probes: list[VariationProbe] = Field(default_factory=list, max_length=32)
 
     @model_validator(mode="after")
     def unique_rules(self):
-        ids = [r.id for r in [*self.metric_rules, *self.stroke_probes]]
+        ids = [r.id for r in [*self.metric_rules, *self.stroke_probes, *self.variation_probes]]
         if len(ids) != len(set(ids)):
             raise ValueError("Design rule IDs must be unique")
         if any(0xD800 <= ord(ch) <= 0xDFFF for ch in self.required_characters):

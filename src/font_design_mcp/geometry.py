@@ -61,30 +61,50 @@ def move_handle(glyph, identifier, x, y, mode):
     return [handle.identifier, opposite.identifier, node.identifier]
 
 
-def join_issues(glyph, tolerance_degrees):
-    """Check declared smooth explicit nodes, including contour wraparound and quadratic joins."""
+def join_issues(glyph, tolerance_degrees, *, undeclared=False):
+    """Check smooth intent, or report unmarked curve joins as non-blocking review candidates."""
     for contour in glyph.contours:
         points = contour.points
         for index, node in enumerate(points):
-            if node.type is None or not node.smooth:
+            if node.type is None or bool(node.smooth) == undeclared:
                 continue
             previous, following = points[index - 1], points[(index + 1) % len(points)]
+            if undeclared and previous.type is not None and following.type is not None:
+                continue
             vin = (node.x - previous.x, node.y - previous.y)
             vout = (following.x - node.x, following.y - node.y)
             left, right = math.hypot(*vin), math.hypot(*vout)
-            evidence = {"glyph": glyph.name, "contour": contour.identifier, "point_id": node.identifier}
+            evidence = {
+                "glyph": glyph.name,
+                "contour": contour.identifier,
+                "point_id": node.identifier,
+                "position": [node.x, node.y],
+            }
+            if undeclared:
+                evidence.update(
+                    kind="unmarked_curve_join",
+                    message="Review tangent discontinuity: an intentional corner is allowed",
+                )
             if min(left, right) <= 1e-8:
-                yield {**evidence, "kind": "degenerate_tangent", "message": "Smooth join has a zero tangent"}
+                yield {
+                    **evidence,
+                    "kind": "unmarked_curve_join" if undeclared else "degenerate_tangent",
+                    "message": "Curve join has a zero tangent",
+                }
                 continue
             dot = (vin[0] * vout[0] + vin[1] * vout[1]) / (left * right)
             angle = math.degrees(math.acos(max(-1, min(1, dot))))
             if angle > tolerance_degrees:
                 yield {
                     **evidence,
-                    "kind": "smooth_mismatch",
+                    "kind": "unmarked_curve_join" if undeclared else "smooth_mismatch",
                     "angle_degrees": round(angle, 3),
                     "tolerance_degrees": tolerance_degrees,
-                    "message": "Declared smooth join has misaligned tangents; intentional corners should not be smooth",
+                    "message": (
+                        "Review tangent discontinuity: an intentional corner is allowed"
+                        if undeclared
+                        else "Declared smooth join has misaligned tangents; intentional corners should not be smooth"
+                    ),
                 }
 
 

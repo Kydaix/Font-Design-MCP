@@ -9,6 +9,47 @@ def design_state(manifest):
     return m.DesignState.model_validate(manifest.get("design", {}))
 
 
+def applies_to_master(rule, master_id):
+    return rule.location is None and rule.master_id in (None, master_id)
+
+
+def needs_variation(spec):
+    return bool(spec.variation_probes) or any(
+        r.location is not None for r in [*spec.metric_rules, *spec.stroke_probes]
+    )
+
+
+def validate_rule_scopes(spec, manifest):
+    variation = m.Variation.model_validate(manifest["variation"]) if manifest.get("variation") else None
+    masters = {s.id for s in variation.masters} if variation else {"default"}
+    axes = {a.tag: a for a in variation.axes} if variation else {}
+
+    def location_valid(location):
+        require(
+            variation is not None, "invalid_input", "Location and variation rules require a variable font"
+        )
+        require(
+            all(
+                tag in axes and axes[tag].minimum <= value <= axes[tag].maximum
+                for tag, value in location.items()
+            ),
+            "invalid_input",
+            "Design rule location has an unknown axis or is outside its range",
+        )
+
+    for rule in [*spec.metric_rules, *spec.stroke_probes]:
+        require(
+            rule.master_id is None or rule.master_id in masters,
+            "invalid_input",
+            f"Unknown design rule master: {rule.master_id}",
+        )
+        if rule.location is not None:
+            location_valid(rule.location)
+    for probe in spec.variation_probes:
+        for value in probe.values:
+            location_valid({**probe.location, probe.axis_tag: value})
+
+
 def coverage(font, spec, corpus=""):
     cmap = {u: g.name for g in font for u in g.unicodes}
     required = set(map(ord, spec.required_characters + corpus))
@@ -38,13 +79,15 @@ class IssueBuffer:
         return self.total
 
 
-def analyze_font(font, spec):
+def analyze_font(font, spec, master_id="default"):
     cmap, missing = coverage(font, spec)
     issues = IssueBuffer(
         {"kind": "missing_codepoint", "codepoint": code, "message": f"Required U+{code:04X} is missing"}
         for code in missing
     )
     measurements = []
+    candidates = IssueBuffer()
+    smooth_count = 0
     for name in spec.reference_glyphs:
         if name not in font:
             issues.append(
@@ -56,6 +99,10 @@ def analyze_font(font, spec):
             )
     for glyph in sorted(font, key=lambda g: g.name):
         issues.extend(join_issues(glyph, spec.tangent_tolerance_degrees))
+        candidates.extend(join_issues(glyph, spec.tangent_tolerance_degrees, undeclared=True))
+        smooth_count += sum(p.type is not None and p.smooth for c in glyph.contours for p in c.points)
+    metric_rules = [r for r in spec.metric_rules if applies_to_master(r, master_id)]
+    stroke_probes = [r for r in spec.stroke_probes if applies_to_master(r, master_id)]
     if spec.digit_spacing == "tabular":
         digits = [(cmap[u], font[cmap[u]].width) for u in range(48, 58) if u in cmap]
         if digits:
@@ -105,7 +152,7 @@ def analyze_font(font, spec):
                 }
             )
 
-    for rule in spec.metric_rules:
+    for rule in metric_rules:
         for name in rule.glyphs:
             if missing_glyph(name, rule.id):
                 continue
@@ -121,7 +168,7 @@ def analyze_font(font, spec):
     flattened_points = 0
     # Raster-like diagnostics need not change source curves. Error is declared, never hidden.
     tolerance = min(0.25, font.info.unitsPerEm / 4000)
-    for probe in spec.stroke_probes:
+    for probe in stroke_probes:
         name = probe.glyph_id
         if missing_glyph(name, probe.id):
             continue
@@ -171,7 +218,30 @@ def analyze_font(font, spec):
         "issues": issues.items,
         "issues_truncated": len(issues.items) < len(issues),
         "measurements": measurements,
-        "counts": {"issues": len(issues), "measurements": len(measurements)},
+        "counts": {
+            "issues": len(issues),
+            "measurements": len(measurements),
+            "review_candidates": len(candidates),
+        },
+        "review_candidates": candidates.items,
+        "review_candidates_truncated": len(candidates.items) < len(candidates),
+        "scope": {
+            "master_id": master_id,
+            "smooth_joins_checked": smooth_count,
+            "metric_rules_checked": len(metric_rules),
+            "stroke_probes_checked": len(stroke_probes),
+            "rules_for_other_masters": sum(
+                r.master_id is not None and r.master_id != master_id
+                for r in [*spec.metric_rules, *spec.stroke_probes]
+            ),
+            "variation": "pending" if needs_variation(spec) else "not_requested",
+            "not_assessed": [
+                "Visual fidelity to references",
+                "Optical spacing and kerning",
+                "Unprobed strokes and unsampled axis locations",
+                "Artistic coherence",
+            ],
+        },
         "limitations": [
             "Passing checks is not professional or human approval.",
             "Only declared smooth joins, coverage and explicit metric/probe rules are checked.",

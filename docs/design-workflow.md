@@ -126,7 +126,7 @@ inherited or propagated from base anchors. This feature is for precomposed glyph
 
 ## 6. Analyze and proof, repeatedly
 
-`font_analyze` checks a selected `master_id` without compiling:
+`font_analyze` checks a selected `master_id`; source-only rules do not require compilation:
 
 * explicit smooth-node tangent alignment (including wraparound and quadratic joins), and degenerate tangents;
 * required Unicode coverage and reference-glyph presence;
@@ -150,6 +150,53 @@ including revision comparisons. Missing glyphs are labeled, never substituted. G
 to 2048 pixels. Proofs compare shapes, not shaping behavior; separately use `render_text` for words and
 numbers at intended sizes with and without kerning. Stabilize bearings before adding many kern pairs.
 
+### Variable targets and honest report scope
+
+Each metric rule or stroke probe accepts an optional `master_id` **or** `location` (never both).
+A location checks compiled variable outlines, with omitted axes at their defaults; `location={}` explicitly
+checks the default compiled instance. Unknown masters/axes, out-of-range coordinates and location rules
+on static fonts fail analysis instead of being silently skipped. Contracts can be saved before configuration,
+but must resolve when analyzed, validated or used for gated export.
+
+Add `variation_probes` to the design spec to check a chosen stroke across an axis:
+
+```json
+{
+  "id": "N-weight",
+  "glyph_id": "N",
+  "axis": "horizontal",
+  "position": 400,
+  "span_index": 0,
+  "axis_tag": "wght",
+  "values": [600, 650, 700, 750, 800],
+  "location": {"wdth": 100},
+  "direction": "nondecreasing",
+  "tolerance": 2,
+  "minimum_change": 20
+}
+```
+
+Values must be strictly increasing, 2–9 samples per probe, up to 32 probes. The sampled axis must not also
+appear in `location`. `direction` accepts `nondecreasing` or `nonincreasing`; `minimum_change` optionally
+requires a signed endpoint change (default 0). Tolerance, targets and changes are in font units.
+This example only applies to a font with those axes/ranges. Sample both normal and extended widths when relevant.
+Intervals are still sorted spatially: a span changing identity near a junction is a reason to inspect the probe.
+
+Reports include `scope`: checked smooth joins, applied metric/probe counts, rules for other masters,
+and variation status (`not_requested`, `pending`, `checked`, or `unavailable_compile_failed`).
+Variation evidence appears in `variation.measurements`; aggregate counts include these measurements.
+`checks_passed` means the requested checks passed, even when no stroke rule was declared.
+It is never a visual quality score. Unmarked curve tangent discontinuities appear separately in
+`review_candidates`, with point IDs and exact counts (up to 2000 entries). Intentional corners remain valid.
+
+### Combining marks in exports
+
+Private compiler copies receive controlled `languagesystem` declarations derived from encoded scripts.
+This keeps Latin `mark` active alongside `kern`; authoritative UFO features and hashes remain unchanged.
+Export validation checks that matching encoded Latin base/mark anchor pairs are reachable through the
+Latin `mark` feature, including cached TTF and WOFF2. Missing anchors do not create an attachment requirement.
+Mark stacking, ligature attachment and optical accent placement need their own review.
+
 ## 7. Interpret validation and export accurately
 
 `font_validate.valid` retains its technical meaning; `technical_valid` makes that explicit.
@@ -157,8 +204,9 @@ numbers at intended sizes with and without kerning. Stabilize bearings before ad
 use `font_analyze(master_id=...)` for other masters. Compilation still validates all configured masters.
 
 `font_build(require_design_checks=true)` requires nonempty `required_characters` and successful diagnostics
-on **every configured master** against the shared contract. Targets applying only to one weight should not
-be encoded as a shared invariant. The default export remains ungated for compatibility. Passing this gate
+on **every configured master**, plus all declared location/variation checks on compiled outlines, before retaining
+an export. Rules without a scope apply to every master; use `master_id` for weight-specific targets.
+The default export remains ungated for compatibility; its response reports `design_gate="not_requested"`. Passing this gate
 is not proof of interpolation quality, visual fidelity, readability, absence of all geometry defects, or
 professional/human approval.
 

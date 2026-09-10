@@ -17,11 +17,12 @@ from filelock import FileLock, Timeout
 from fontTools.ttLib import TTFont
 
 from .domain import FontError, require
+from .layout import compiler_font, validate_latin_marks
 from .storage import digest_tree, files_checked, read_json, safe_path, write_json
 from .telemetry import count, phase
 from .variable import validate_variable_binary, write_designspace
 
-CACHE_POLICY = "fontmake-ttf-variable-no-autohint-keep-overlaps-original-names-v2"
+CACHE_POLICY = "fontmake-ttf-variable-languagesystems-latin-marks-v3"
 CACHE_LIMIT = 128_000_000
 
 
@@ -98,6 +99,7 @@ def compile_font(store, project_id, font, manifest, source, formats, retain=Fals
                         )
                         with TTFont(path, lazy=False) as binary:
                             validate_variable_binary(binary, manifest.get("variation"))
+                            validate_latin_marks(binary, font)
                             require(
                                 binary.getBestCmap() == {u: g.name for g in font for u in g.unicodes},
                                 "build_failed",
@@ -192,7 +194,7 @@ def _compile_font(store, project_id, font, manifest, source, formats, artifacts,
         input_path = write_designspace(stage, configuration, fonts)
     else:
         input_path = stage / "input.ufo"
-        font.save(input_path, formatVersion=3)
+        compiler_font(font).save(input_path, formatVersion=3)
     command = [
         sys.executable,
         "-m",
@@ -217,6 +219,7 @@ def _compile_font(store, project_id, font, manifest, source, formats, artifacts,
     require(ttf.is_file() and 0 < ttf.stat().st_size <= 16_000_000, "build_failed", "Invalid compiler output")
     with TTFont(ttf, lazy=False, recalcTimestamp=False) as binary:
         validate_variable_binary(binary, configuration)
+        layout_report = validate_latin_marks(binary, font)
         required = {"head", "hhea", "maxp", "OS/2", "hmtx", "cmap", "name", "post", "glyf", "loca"}
         require(required.issubset(binary.keys()), "build_failed", "Missing required OpenType tables")
         require(binary.getGlyphOrder()[0] == ".notdef", "build_failed", "Glyph 0 must be .notdef")
@@ -234,6 +237,7 @@ def _compile_font(store, project_id, font, manifest, source, formats, artifacts,
     if "woff2" in formats:
         with TTFont(stage / "font.woff2") as webfont:
             validate_variable_binary(webfont, configuration)
+            validate_latin_marks(webfont, font)
             require(
                 webfont.getBestCmap() == {u: g.name for g in font for u in g.unicodes},
                 "build_failed",
@@ -252,6 +256,7 @@ def _compile_font(store, project_id, font, manifest, source, formats, artifacts,
         "formats": list(dict.fromkeys(formats)),
         "tables": tables,
         "engine": f"fontmake + fontTools; unhinted {'variable' if configuration else 'static'} TrueType",
+        "layout": layout_report,
         "variable": bool(configuration),
         "variation": configuration,
         "versions": {name: version(name) for name in ("fontmake", "fonttools", "ufoLib2", "ufo2ft")},
