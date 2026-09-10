@@ -42,4 +42,4 @@ line-length = 110
 select = ["E4", "E7", "E9", "F", "I"]
 
 [tool.hatch.build.targets.sdist]
-include = ["/src", "/tests", "/examples", "/scripts", "/mcpb", "/server.json", "/pyproject.toml", "/uv.lock", "/requirements.lock", "/package.json", "/install.mjs", "/README.md", "/README.fr.md", "/LICENSE", "/.github"]
+include = ["/src", "/tests", "/docs", "/examples", "/scripts", "/mcpb", "/server.json", "/pyproject.toml", "/uv.lock", "/requirements.lock", "/package.json", "/install.mjs", "/README.md", "/README.fr.md", "/LICENSE", "/.github"]

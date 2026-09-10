@@ -1,12 +1,16 @@
 """Application boundary shared by MCP and domain tests."""
 
+import io
 import uuid
 from contextlib import ExitStack
 from copy import deepcopy
 from itertools import dropwhile, islice
 
+from PIL import Image
+
 from . import models as m
 from .build import compile_font
+from .design import analyze_font, coverage, design_state, refresh_compositions
 from .domain import (
     FontError,
     edit_glyph,
@@ -18,6 +22,8 @@ from .domain import (
     set_info,
     validate_font,
 )
+from .proof import proof_frame, proof_view
+from .references import import_png, reference_frame
 from .render import glyph_frame, glyph_view, save_render, text_view
 from .storage import Store
 from .telemetry import phase, profiled
@@ -34,6 +40,10 @@ CAPABILITIES = {
     "precomposed_components": True,
     "combining_mark_positioning": "not advertised; untested",
     "svg_import": False,
+    "reference_png_import": True,
+    "design_diagnostics": True,
+    "linked_accent_composition": True,
+    "automatic_tracing": False,
     "otf": False,
     "human_approval_via_tools": False,
     "limits": {"glyphs": 512, "source_points": 50000, "text_characters": 256, "png_bytes": 2000000},
@@ -106,6 +116,25 @@ TOOLS = {
         False,
         "Build real TTF and/or WOFF2 from a frozen revision, automatically variable when axes/masters are configured. Returns persistent relative paths and hashes. Does not alter sources.",
     ),
+    "font_analyze": (
+        m.Analyze,
+        False,
+        "Measure declared design rules, smooth joins, digit spacing and required coverage without compiling. "
+        "Returns localized issues, not artistic approval. detail=full includes measurements.",
+    ),
+    "reference_import": (
+        m.ReferenceImport,
+        False,
+        "Import a bounded single-frame PNG from workspace/inbox as an immutable drawing reference. "
+        "image_to_font maps image pixels (top-left, Y down) to font units (baseline, Y up). "
+        "Requires expected_revision. No tracing or automatic rescaling; use reference_id with render_glyph.",
+    ),
+    "render_proof": (
+        m.RenderProof,
+        False,
+        "Render up to 32 glyphs at one common scale, optionally comparing revisions. "
+        "Missing glyphs are explicit placeholders; use render_text separately for shaped words.",
+    ),
     "history_list": (
         m.Page,
         True,
@@ -132,9 +161,10 @@ class Service:
             self.store.project(project_id).mkdir()
             with self.store.lock(project_id):
                 font = new_font(request.metadata, request.metrics)
-                manifest = self.store.commit(
-                    project_id, font, {"brief": request.brief, "decisions": []}, "Project created"
-                )
+                extra = {"brief": request.brief, "decisions": []}
+                if request.design_spec is not None:
+                    extra["design"] = m.DesignState(spec=request.design_spec).model_dump()
+                manifest = self.store.commit(project_id, font, extra, "Project created")
             return m.Result(
                 ok=True,
                 summary="Project created with .notdef and space",
@@ -158,6 +188,7 @@ class Service:
             )
             require(master_id in fonts, "missing_reference", f"Unknown master {master_id}")
             font = fonts[master_id]
+            state = design_state(manifest)
             result = m.Result(ok=True, summary=f"{name} completed", project_id=project_id, revision=revision)
             if isinstance(request, m.WriteRef):
                 require(
@@ -168,6 +199,8 @@ class Service:
                 extra = {"brief": manifest["brief"], "decisions": list(manifest["decisions"])}
                 if "variation" in manifest:
                     extra["variation"] = manifest["variation"]
+                persist_design = "design" in manifest
+                links = state.composition_links.setdefault(master_id, {})
                 if name == "project_update":
                     require(
                         request.metrics is None or request.metrics.units_per_em == font.info.unitsPerEm,
@@ -183,20 +216,81 @@ class Service:
                             len(extra["decisions"]) < 128, "limit_exceeded", "Maximum 128 decision entries"
                         )
                         extra["decisions"].append(request.decision.model_dump())
+                    if request.design_spec is not None:
+                        state.spec = request.design_spec
+                        persist_design = True
+                    if request.remove_reference_ids:
+                        removed = set(request.remove_reference_ids)
+                        require(
+                            removed <= {r.id for r in state.references},
+                            "missing_reference",
+                            "A reference selected for removal does not exist",
+                        )
+                        state.references = [r for r in state.references if r.id not in removed]
                     result.changed = ["project"]
+                elif name == "reference_import":
+                    existing = next((r for r in state.references if r.id == request.reference_id), None)
+                    require(
+                        (existing is not None) == request.replace,
+                        "missing_reference" if request.replace else "duplicate_id",
+                        "Replacement needs an existing reference ID; addition needs a new ID",
+                    )
+                    require(
+                        existing is not None or len(state.references) < 64,
+                        "limit_exceeded",
+                        "Maximum 64 drawing references",
+                    )
+                    image, original_hash = import_png(self.store, request.source_path)
+                    reference = m.DrawingReference(
+                        id=request.reference_id,
+                        glyph_id=request.glyph_id,
+                        label=request.label,
+                        image_to_font=request.image_to_font,
+                        width=image.width,
+                        height=image.height,
+                        source_sha256=original_hash,
+                        encoded_bytes=1,  # Exact normalized size is filled before committing.
+                        uri=f"font-design://{project_id}/{revision}/{'0' * 32}/image.png?sha256={'0' * 64}",
+                    )
+                    artifact, png = save_render(
+                        self.store,
+                        project_id,
+                        revision,
+                        image,
+                        {"kind": "drawing_reference"},
+                        {"source_sha256": original_hash, "engine": "Imported PNG reference; no tracing"},
+                    )
+                    artifact["uri"] = self.store.resource_uri(
+                        project_id, revision, artifact["artifact_id"], "image.png"
+                    )
+                    reference.uri = artifact["uri"]
+                    reference.encoded_bytes = artifact["bytes"]
+                    state.references = [r for r in state.references if r.id != reference.id] + [reference]
+                    result.data = {"reference": reference.model_dump(mode="json"), "images": [artifact]}
+                    result.changed = [f"reference:{reference.id}"]
+                    if request.image_mode == "inline":
+                        images.append(png)
                 elif name == "variable_configure":
                     extra["variation"] = request.variation.model_dump()
+                    previous_masters = set(fonts)
                     fonts = {
                         master.id: fonts[master.id] if master.id in fonts else deepcopy(fonts["default"])
                         for master in request.variation.masters
                     }
+                    state.composition_links = {
+                        key: deepcopy(
+                            state.composition_links.get(key if key in previous_masters else "default", {})
+                        )
+                        for key in fonts
+                    }
                     result.changed = ["variation"]
                     result.data = extra["variation"]
                 elif name == "glyph_edit":
-                    result.data = edit_glyph(font, request)
+                    result.data = edit_glyph(font, request, links)
                     result.changed = [request.glyph_id]
                 elif name == "font_edit":
-                    changes = [edit_glyph(font, change) for change in request.glyphs]
+                    changes = [edit_glyph(font, change, links) for change in request.glyphs]
+                    dependent_changes = refresh_compositions(font, links)
                     if any(isinstance(op, m.Bearings) for op in request.spacing):
                         validate_font(font)  # Bearings traverse the new component graph.
                     spacing = (
@@ -207,16 +301,19 @@ class Service:
                                 expected_revision=revision,
                                 operations=request.spacing,
                             ),
+                            links,
                         )
                         if request.spacing
                         else {"touched_ids": []}
                     )
                     result.data = {"glyphs": changes, "spacing": spacing}
                     result.changed = list(
-                        dict.fromkeys([g.glyph_id for g in request.glyphs] + spacing["touched_ids"])
+                        dict.fromkeys(
+                            [g.glyph_id for g in request.glyphs] + spacing["touched_ids"] + dependent_changes
+                        )
                     )
                 elif name == "spacing_edit":
-                    result.data = edit_spacing(font, request)
+                    result.data = edit_spacing(font, request, links)
                     result.changed = result.data["touched_ids"]
                 elif name == "history_restore":
                     font, restored, _ = self.store.load(project_id, request.target_revision)
@@ -228,7 +325,15 @@ class Service:
                     }
                     if "variation" in restored:
                         extra["variation"] = restored["variation"]
+                    state = design_state(restored)
+                    persist_design = "design" in restored
                     result.changed = ["project"]
+                for key, master_font in fonts.items():
+                    affected = refresh_compositions(master_font, state.composition_links.get(key, {}))
+                    result.changed = list(dict.fromkeys([*result.changed, *affected]))
+                state.composition_links = {k: v for k, v in state.composition_links.items() if v}
+                if persist_design or state != m.DesignState():
+                    extra["design"] = state.model_dump()
                 new = self.store.commit(
                     project_id, fonts["default"], extra, request.summary or name, revision, masters=fonts
                 )
@@ -250,6 +355,9 @@ class Service:
                     "variation": manifest.get("variation"),
                     "brief": manifest["brief"],
                     "decisions": manifest["decisions"],
+                    "design_spec": state.spec.model_dump(),
+                    "references": [r.model_dump() for r in state.references],
+                    "composition_links": state.model_dump()["composition_links"],
                     "family": font.info.familyName,
                     "style": font.info.styleName,
                     "units_per_em": font.info.unitsPerEm,
@@ -271,6 +379,18 @@ class Service:
                         k: result.data[k]
                         for k in ("family", "style", "units_per_em", "metrics", "total", "variation")
                     }
+                    result.data["design_context"] = {
+                        "brief": manifest["brief"][:1000],
+                        "notes": state.spec.notes[:500],
+                        "protected_features": state.spec.protected_features[:500],
+                        "required_characters": state.spec.required_characters[:256],
+                        "reference_glyphs": state.spec.reference_glyphs,
+                        "digit_spacing": state.spec.digit_spacing,
+                        "reference_ids": [r.id for r in state.references],
+                        "rule_count": len(state.spec.metric_rules) + len(state.spec.stroke_probes),
+                        "latest_decision": manifest["decisions"][-1:] or [],
+                        "full_context": "project_inspect(detail=full)",
+                    }
             elif name == "glyph_get":
                 require(request.glyph_id in font, "missing_reference", f"Missing glyph {request.glyph_id}")
                 result.data = {
@@ -282,18 +402,64 @@ class Service:
                     ),
                     "metrics": metrics(font[request.glyph_id], font),
                 }
+            elif name == "font_analyze":
+                locks.close()
+                report = analyze_font(font, state.spec)
+                report["master_id"] = master_id
+                self.store.verify(project_id, revision)
+                uri = self.store.save_report(project_id, revision, report)
+                if request.detail == "summary":
+                    result.data = {
+                        k: report[k]
+                        for k in (
+                            "checks_passed",
+                            "coverage_complete",
+                            "counts",
+                            "review",
+                            "artistic_approval",
+                            "reference_fidelity",
+                            "master_id",
+                            "limitations",
+                        )
+                    }
+                    result.data.update(
+                        issues=report["issues"][:10],
+                        truncated=report["issues_truncated"] or len(report["issues"]) > 10,
+                    )
+                else:
+                    result.data = report
+                result.data["report_uri"] = uri
+                result.summary = (
+                    "Design diagnostics passed" if report["checks_passed"] else "Design issues found"
+                )
             elif name in ("font_build", "font_validate"):
+                if name == "font_build" and request.require_design_checks:
+                    require(
+                        bool(state.spec.required_characters),
+                        "design_contract_missing",
+                        "Set design_spec.required_characters before using the export gate",
+                    )
+                    checked = self.store.load_masters(project_id, manifest, font)
+                    for key, master_font in checked.items():
+                        report = analyze_font(master_font, state.spec)
+                        require(
+                            report["checks_passed"],
+                            "design_checks_failed",
+                            f"Master {key}: {report['counts']['issues']} design issues; run font_analyze",
+                        )
                 locks.close()
                 if name == "font_validate":
                     observations = validate_font(font)
-                    coverage = {u for g in font for u in g.unicodes}
-                    missing = sorted({ord(ch) for ch in request.corpus} - coverage)
+                    _, missing = coverage(font, state.spec, request.corpus)
+                    design_report = analyze_font(font, state.spec)
                     result.data = {
                         "review": "automatic",
                         "valid": True,
                         "errors": [],
                         "observations": observations,
                         "missing_codepoints": missing,
+                        "coverage_complete": not missing,
+                        "design": {**design_report, "master_id": "default"},
                     }
                     result.warnings = [f"Missing U+{u:04X}" for u in missing]
                     if not font.info.openTypeNameLicense:
@@ -303,6 +469,7 @@ class Service:
                         result.data["build"] = build
                     except FontError as exc:
                         result.data.update(valid=False, errors=[{"code": exc.code, "message": str(exc)}])
+                    result.data["technical_valid"] = result.data["valid"]
                     result.summary = (
                         "Technical validation passed"
                         if result.data["valid"]
@@ -315,6 +482,17 @@ class Service:
                         issues = [o for o in observations if "kind" in o or o.get("direction") == "zero"]
                         result.data.pop("observations")
                         result.data.pop("build", None)
+                        result.data["design"] = {
+                            k: result.data["design"][k]
+                            for k in (
+                                "checks_passed",
+                                "counts",
+                                "review",
+                                "artistic_approval",
+                                "reference_fidelity",
+                                "master_id",
+                            )
+                        }
                         result.data.update(
                             counts={
                                 "errors": len(result.data["errors"]),
@@ -342,7 +520,7 @@ class Service:
                     result.data["report_uri"] = self.store.resource_uri(
                         project_id, revision, artifact, "artifact.json"
                     )
-            elif name in ("render_glyph", "render_text"):
+            elif name in ("render_glyph", "render_text", "render_proof"):
                 sources = [(font, manifest, source)]
                 if request.compare_revision:
                     other, version, ufo = self.store.load(project_id, request.compare_revision)
@@ -353,8 +531,28 @@ class Service:
                     sources.append((other, version, ufo))
                 locks.close()
                 parameters = request.model_dump(exclude={"project_id", "revision", "compare_revision"})
+                reference, reference_image = None, None
                 if name == "render_glyph":
                     frame = glyph_frame([f for f, _, _ in sources], request.glyph_id)
+                    if request.reference_id:
+                        reference = next((r for r in state.references if r.id == request.reference_id), None)
+                        require(
+                            reference is not None and reference.glyph_id == request.glyph_id,
+                            "missing_reference",
+                            "Reference must exist and belong to the requested glyph",
+                        )
+                        data, _ = self.store.read_resource(reference.uri)
+                        with Image.open(io.BytesIO(data)) as imported:
+                            reference_image = imported.convert("RGB")
+                        box = reference_frame(reference)
+                        frame = [
+                            min(frame[0], box[0]),
+                            min(frame[1], box[1]),
+                            max(frame[2], box[2]),
+                            max(frame[3], box[3]),
+                        ]
+                elif name == "render_proof":
+                    frame = proof_frame([f for f, _, _ in sources], request.glyph_ids)
                 else:
                     # Shared em-normalized frame makes revisions with different vertical metrics comparable.
                     frame = (
@@ -364,7 +562,19 @@ class Service:
                 result.data["images"] = []
                 for f, version, ufo in sources:
                     if name == "render_glyph":
-                        image, details = glyph_view(f, request.glyph_id, request, frame)
+                        if reference is None:
+                            image, details = glyph_view(f, request.glyph_id, request, frame)
+                        else:
+                            image, details = glyph_view(
+                                f, request.glyph_id, request, frame, (reference_image, reference)
+                            )
+                            details["reference"] = reference.model_dump(mode="json")
+                            self.store.read_resource(
+                                reference.uri
+                            )  # Recheck immutable evidence after rendering.
+                    elif name == "render_proof":
+                        image, details = proof_view(f, request, frame)
+                        result.warnings.extend(details["warnings"])
                     else:
                         build, path = compile_font(self.store, project_id, f, version, ufo, ["ttf"])
                         image, details = text_view(
@@ -404,10 +614,14 @@ class Service:
                                 "advance_units",
                                 "metrics",
                                 "location",
+                                "reference",
+                                "frame",
+                                "scale",
+                                "missing_glyphs",
                             }
                             or (k == "positions" and request.detail == "positions")
                         }
-                        for key in ("warnings", "missing_codepoints"):
+                        for key in ("warnings", "missing_codepoints", "missing_glyphs"):
                             if len(data.get(key, [])) > 10:
                                 data[key + "_count"] = len(data[key])
                                 data[key] = data[key][:10]

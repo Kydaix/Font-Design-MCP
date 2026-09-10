@@ -21,7 +21,7 @@ ENGINE = (
 )
 
 
-def glyph_view(font, name, request, frame):
+def glyph_view(font, name, request, frame, reference=None):
     g = font[name]
     xmin, ymin, xmax, ymax = frame
     w, h = request.width, request.height
@@ -31,6 +31,10 @@ def glyph_view(font, name, request, frame):
     g.draw(pen)
     layer = pen.image(w, h, transform=Transform(scale, 0, 0, scale, tx, ty))
     image = Image.new("RGB", (w, h), "white")
+    if reference is not None:
+        from .references import reference_layer
+
+        image = reference_layer(reference[0], reference[1], w, h, scale, tx, ty)
     image.paste(layer, (0, 0), layer)
     draw = ImageDraw.Draw(image)
 

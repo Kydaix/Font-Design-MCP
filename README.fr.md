@@ -214,6 +214,18 @@ sur l'un des outils de rendu affiche deux révisions dans les mêmes conditions 
 La validation technique et l'appréciation de l'agent sont distinctes d'une approbation humaine. Le serveur
 n'attribue pas de note artistique et n'accepte pas qu'un agent déclare une approbation humaine authentifiée.
 
+## Travailler à partir de tes dessins
+
+Importer des PNG calibrés avec `reference_import`, préserver leurs particularités et comparer les contours
+reconstruits avec `render_glyph(reference_id=...)`. `design_spec` conserve la couverture et les cibles
+mesurables ; `font_analyze` localise les écarts ; `render_proof` compare les lettres **et les chiffres**
+à échelle commune. Les éditions préservant les poignées et les accents liés évitent certaines incohérences
+lors des corrections locales.
+
+Il s'agit d'une reconstruction contrôlée, **pas d'une vectorisation automatique ni d'une garantie de qualité
+professionnelle**. Le [guide de travail à partir de dessins](docs/design-workflow.fr.md) détaille les exemples,
+la calibration, les limites, le contrôle d'export facultatif et la compatibilité du schéma 3.
+
 ## Outils disponibles
 
 Le SDK MCP officiel expose les schémas d'entrée et de sortie via `tools/list`. Les réponses contiennent des
@@ -231,6 +243,9 @@ données structurées, des résumés lisibles, les révisions, les avertissement
 | `spacing_edit` | Régler avances, approches, paires et groupes de crénage |
 | `render_glyph` | Rendre un glyphe avec repères, poignées et comparaison de révisions facultatifs |
 | `render_text` | Compiler, composer et rendre un texte à plusieurs tailles |
+| `reference_import` | Importer un PNG calibré depuis workspace/inbox comme référence immuable |
+| `font_analyze` | Contrôler les raccords lisses, la couverture, les chiffres et les cibles de dessin |
+| `render_proof` | Comparer plusieurs glyphes à échelle commune, y compris entre révisions |
 | `font_validate` | Vérifier géométrie, couverture Unicode, compilation et tables OpenType |
 | `font_build` | Exporter en TTF et/ou WOFF2 statique ou variable depuis une révision figée |
 | `variable_configure` | Définir les axes continus et configurer les masters du projet |
@@ -246,7 +261,9 @@ incluses par défaut ; `image_mode="resource"` renvoie des références à récu
 
 ## Sauvegarder et restaurer votre travail
 
-UFO 3 est la source typographique d'autorité. Les binaires et les images sont des artefacts dérivés liés à une révision :
+UFO 3 est la source d'autorité des contours ; le contrat de dessin et les relations sont versionnés dans
+le manifeste. Les binaires et les aperçus sont dérivés, mais **les références dessinées importées sont des
+entrées du projet** : leurs artefacts doivent être conservés et sauvegardés avec l'ensemble du projet :
 
 ```text
 workspace/<project_id>/

@@ -18,7 +18,7 @@ from pydantic import TypeAdapter
 from ufoLib2 import Font
 
 from .domain import FontError, require, validate_font
-from .models import Revision, Variation
+from .models import DesignState, Revision, Variation
 from .telemetry import count, phase
 
 REVISION = TypeAdapter(Revision)
@@ -180,6 +180,16 @@ class Store:
         return f"font-design://{project_id}/{revision}/{artifact_id}/{filename}?sha256={digest}"
 
     def save_report(self, project_id, revision, report):
+        require(
+            len(
+                json.dumps(
+                    {**report, "revision": revision}, ensure_ascii=False, allow_nan=False, indent=2
+                ).encode("utf-8")
+            )
+            <= 4_000_000,
+            "limit_exceeded",
+            "Report exceeds 4 MB; reduce the requested diagnostic scope",
+        )
         root = safe_path(self.root, self.project(project_id) / "artifacts")
         root.mkdir(exist_ok=True)
         identifier = uuid.uuid4().hex
@@ -244,10 +254,20 @@ class Store:
         require(
             manifest.get("revision") == revision
             and manifest.get("project_id") == project_id
-            and manifest.get("schema") in (1, 2),
+            and manifest.get("schema") in (1, 2, 3),
             "external_modification",
             "Invalid revision manifest",
         )
+        if "design" in manifest:
+            require(
+                manifest["schema"] == 3, "external_modification", "Design state requires manifest schema 3"
+            )
+            state = DesignState.model_validate(manifest["design"])
+            require(
+                all(r.uri.startswith(f"font-design://{project_id}/") for r in state.references),
+                "path_denied",
+                "Drawing references must belong to this project",
+            )
         return folder, manifest
 
     def history(self, project_id):
@@ -307,6 +327,9 @@ class Store:
                     "external_modification",
                     f"Master {master.id} changed externally",
                 )
+        if "design" in manifest:
+            for reference in DesignState.model_validate(manifest["design"]).references:
+                self.read_resource(reference.uri)
         return manifest, ufo
 
     @phase("load")
@@ -334,6 +357,20 @@ class Store:
         """Caller holds project lock. Never overwrite a committed UFO."""
         validate_font(font)
         project = self.project(project_id)
+        if "design" in extra:
+            state = DesignState.model_validate(extra["design"])
+            require(
+                set(state.composition_links) <= set(masters or {"default": font}),
+                "missing_reference",
+                "Linked compositions reference an unknown master",
+            )
+            for reference in state.references:
+                require(
+                    reference.uri.startswith(f"font-design://{project_id}/"),
+                    "path_denied",
+                    "Drawing references must belong to this project",
+                )
+                self.read_resource(reference.uri)
         if expected is not None:
             require(
                 self.head(project_id)["revision"] == expected, "stale_revision", "Expected revision is stale"
@@ -374,7 +411,7 @@ class Store:
         fsync_directory(ufo / "glyphs")
         fsync_directory(ufo)
         manifest = {
-            "schema": 2 if "variation" in extra else 1,
+            "schema": 3 if "design" in extra else 2 if "variation" in extra else 1,
             "project_id": project_id,
             "revision": revision,
             "parent": expected,

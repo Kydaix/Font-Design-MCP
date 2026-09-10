@@ -18,7 +18,7 @@ async def main():
         )
         async with stdio_client(params) as (read, write), ClientSession(read, write) as session:
             await session.initialize()
-            assert len((await session.list_tools()).tools) == 15
+            assert len((await session.list_tools()).tools) == 18
             result = await session.call_tool("project_create", {"metadata": {"family": "Legacy"}})
             # Deliberately use only the JSON text block: old hosts may ignore structuredContent.
             data = json.loads(result.content[0].text)
