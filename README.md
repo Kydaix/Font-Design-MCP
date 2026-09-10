@@ -300,8 +300,9 @@ automatically exports a variable font. Up to 4 continuous axes and 8 masters, su
 tracing, editor adapters, collaborative networking, and a full graphical editor. No hinting or arbitrary
 OpenType feature code is exposed. Text previews are single-line specimens, not paragraph layout.
 
-Precomposed **Á built from components is tested**. General combining-mark positioning (`mark`/`mkmk`) and
-complex-script coverage are not advertised. Source previews can differ slightly from compiled contours
+Precomposed **Á built from components is tested**. Latin combining marks with matching base/mark anchors
+are checked for reachable `mark` positioning in TTF and WOFF2, including variable exports and cached builds.
+Stacked marks (`mkmk`) and complex-script coverage are not certified. Source previews can differ slightly from compiled contours
 after curve conversion, and unhinted FreeType output need not match native OS rendering.
 
 ## Build from source

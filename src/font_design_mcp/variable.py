@@ -3,6 +3,7 @@
 from fontTools.designspaceLib import AxisDescriptor, DesignSpaceDocument, InstanceDescriptor, SourceDescriptor
 
 from .domain import require
+from .layout import compiler_font
 from .models import Variation
 
 
@@ -46,7 +47,7 @@ def write_designspace(stage, configuration, fonts):
     for master in variation.masters:
         font = fonts[master.id]
         path = stage / f"master-{master.id}.ufo"
-        font.save(path, formatVersion=3, validate=True)
+        compiler_font(font).save(path, formatVersion=3, validate=True)
         location = {axis.name: master.location[axis.tag] for axis in variation.axes}
         doc.addSource(
             SourceDescriptor(

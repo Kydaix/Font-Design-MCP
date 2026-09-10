@@ -90,7 +90,7 @@ marques combinantes.
 
 ## Examiner l'ensemble avant export
 
-`font_analyze` mesure sans compiler les tangentes des raccords déclarés lisses, la couverture, les glyphes
+`font_analyze` mesure sur les sources les tangentes des raccords déclarés lisses, la couverture, les glyphes
 de référence, les cibles de métriques et les épaisseurs explicitement demandées. Les sondes horizontales
 coupent à Y constant et numérotent les intervalles remplis de gauche à droite ; les verticales coupent à
 X constant et les numérotent de bas en haut. Les contreformes respectent le remplissage non nul.
@@ -108,13 +108,57 @@ avec et sans crénage. Stabiliser les approches avant d'accumuler les paires de 
 `font_validate` sépare désormais `technical_valid`, `coverage_complete` et `design.checks_passed`.
 Le champ historique `valid` garde son sens technique. Le résumé de dessin porte sur le master par défaut ;
 `font_analyze(master_id=...)` examine les autres. `font_build(require_design_checks=true)` exige une
-couverture déclarée non vide et applique le contrat partagé à **tous les masters** avant export. Ne pas
-utiliser une cible propre à une graisse comme invariant commun à toute la famille.
+couverture déclarée non vide et contrôle **tous les masters**, puis les positions et progressions déclarées
+sur les contours compilés, avant de conserver l'export. Les règles sans portée s'appliquent à chaque master ;
+utiliser `master_id` pour une cible propre à une graisse. L'export libre reste disponible et indique
+`design_gate="not_requested"` dans sa réponse.
 
 Une validation réussie ne certifie ni la beauté, ni la fidélité à l'image, ni toutes les interpolations.
 Ne sont pas implémentés : vectorisation/reconstruction automatique des courbes, inférence du style,
 recettes paramétriques persistantes, certification de continuité de courbure, espacement optique automatique
 et contrôle exhaustif des axes variables. Le serveur ne revendique aucune approbation artistique ou humaine.
+
+## Cibles par master et progression variable
+
+Chaque règle de métrique ou sonde d'épaisseur accepte `master_id` **ou** `location`, jamais les deux.
+Une position mesure les contours de la police variable compilée ; les axes omis prennent leur valeur
+par défaut. `location={}` désigne explicitement cette instance compilée par défaut.
+Un master inconnu, un axe inconnu, une position hors plage ou une règle de position sur une police statique
+fait échouer l'analyse. Le contrat peut être enregistré avant la configuration, mais doit être résolu
+lors de l'analyse, de la validation ou de l'export contrôlé.
+
+Ajouter des `variation_probes` au contrat pour mesurer la progression d'un trait :
+
+```json
+{
+  "id": "N-graisse", "glyph_id": "N", "axis": "horizontal", "position": 400,
+  "span_index": 0, "axis_tag": "wght", "values": [600, 650, 700, 750, 800],
+  "location": {"wdth": 100}, "direction": "nondecreasing",
+  "tolerance": 2, "minimum_change": 20
+}
+```
+
+Cet exemple suppose ces axes et plages. Les valeurs sont strictement croissantes : 2 à 9 positions par
+sonde, 32 sondes maximum. L'axe mesuré ne doit pas aussi apparaître dans `location`.
+`nondecreasing` exige une progression croissante, `nonincreasing` une progression décroissante, à la
+tolérance près. `minimum_change` exige un changement signé minimal entre les extrémités (0 par défaut).
+Toutes les mesures sont en unités de police. Ces sondes ne certifient pas les positions non échantillonnées.
+
+Le champ `scope` expose le nombre de raccords lisses contrôlés, les règles appliquées et celles des autres
+masters. La variation indique `not_requested`, `pending`, `checked` ou `unavailable_compile_failed`.
+Les mesures compilées figurent dans `variation.measurements` et dans les compteurs agrégés.
+Les cassures de tangente non déclarées lisses apparaissent dans `review_candidates` avec les IDs des points,
+jusqu'à 2000 entrées et un décompte exact. Elles restent des points à examiner : un angle volontaire est permis.
+Une réussite signifie seulement que les contrôles demandés passent, même si aucune sonde n'a été définie.
+
+## Marques combinantes à l'export
+
+Les copies privées du compilateur reçoivent des déclarations `languagesystem` contrôlées, déduites des
+écritures encodées. La fonction latine `mark` reste ainsi active lorsque `kern` est présente.
+Les sources UFO et leurs hashes restent inchangés. Les TTF et WOFF2, variables compris et même en cache,
+sont vérifiés pour l'accessibilité des paires d'ancres base/marque latines encodées.
+Sans ancres correspondantes, aucun attachement n'est exigé. L'empilement, les ligatures et le placement
+optique des accents nécessitent une vérification distincte.
 
 ## Sauvegardes et versions
 

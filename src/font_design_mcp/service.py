@@ -10,7 +10,14 @@ from PIL import Image
 
 from . import models as m
 from .build import compile_font
-from .design import analyze_font, coverage, design_state, refresh_compositions
+from .design import (
+    analyze_font,
+    coverage,
+    design_state,
+    needs_variation,
+    refresh_compositions,
+    validate_rule_scopes,
+)
 from .domain import (
     FontError,
     edit_glyph,
@@ -27,6 +34,7 @@ from .references import import_png, reference_frame
 from .render import glyph_frame, glyph_view, save_render, text_view
 from .storage import Store
 from .telemetry import phase, profiled
+from .variation_design import analyze_variation, attach_variation
 
 CAPABILITIES = {
     "source": "UFO 3",
@@ -38,7 +46,7 @@ CAPABILITIES = {
     "curves": ["line", "cubic", "quadratic"],
     "fill_rule": "nonzero",
     "precomposed_components": True,
-    "combining_mark_positioning": "not advertised; untested",
+    "combining_mark_positioning": "Latin mark-to-base GPOS checked on export; stacked marks not certified",
     "svg_import": False,
     "reference_png_import": True,
     "design_diagnostics": True,
@@ -119,8 +127,10 @@ TOOLS = {
     "font_analyze": (
         m.Analyze,
         False,
-        "Measure declared design rules, smooth joins, digit spacing and required coverage without compiling. "
-        "Returns localized issues, not artistic approval. detail=full includes measurements.",
+        "Measure declared design rules, smooth joins, digit spacing and required coverage. "
+        "Rules accept master_id or a variable location; variation_probes measure stroke progression. "
+        "Compiles only when location/variation checks are requested. Unmarked curve joins are review candidates. "
+        "Returns localized issues and explicit scope, not artistic approval. detail=full includes measurements.",
     ),
     "reference_import": (
         m.ReferenceImport,
@@ -387,7 +397,9 @@ class Service:
                         "reference_glyphs": state.spec.reference_glyphs,
                         "digit_spacing": state.spec.digit_spacing,
                         "reference_ids": [r.id for r in state.references],
-                        "rule_count": len(state.spec.metric_rules) + len(state.spec.stroke_probes),
+                        "rule_count": len(state.spec.metric_rules)
+                        + len(state.spec.stroke_probes)
+                        + len(state.spec.variation_probes),
                         "latest_decision": manifest["decisions"][-1:] or [],
                         "full_context": "project_inspect(detail=full)",
                     }
@@ -403,9 +415,20 @@ class Service:
                     "metrics": metrics(font[request.glyph_id], font),
                 }
             elif name == "font_analyze":
+                validate_rule_scopes(state.spec, manifest)
                 locks.close()
-                report = analyze_font(font, state.spec)
+                report = analyze_font(font, state.spec, master_id)
                 report["master_id"] = master_id
+                if needs_variation(state.spec):
+                    _, binary_bytes = compile_font(
+                        self.store,
+                        project_id,
+                        fonts["default"],
+                        manifest,
+                        source,
+                        ["ttf"],
+                    )
+                    attach_variation(report, analyze_variation(binary_bytes, state.spec))
                 self.store.verify(project_id, revision)
                 uri = self.store.save_report(project_id, revision, report)
                 if request.detail == "summary":
@@ -420,19 +443,26 @@ class Service:
                             "reference_fidelity",
                             "master_id",
                             "limitations",
+                            "scope",
                         )
                     }
                     result.data.update(
                         issues=report["issues"][:10],
+                        review_candidates=report["review_candidates"][:10],
+                        review_candidates_truncated=report["counts"]["review_candidates"] > 10,
                         truncated=report["issues_truncated"] or len(report["issues"]) > 10,
                     )
                 else:
                     result.data = report
                 result.data["report_uri"] = uri
                 result.summary = (
-                    "Design diagnostics passed" if report["checks_passed"] else "Design issues found"
+                    "Declared checks passed; visual quality not assessed"
+                    if report["checks_passed"]
+                    else "Design issues found"
                 )
             elif name in ("font_build", "font_validate"):
+                if name == "font_validate" or request.require_design_checks:
+                    validate_rule_scopes(state.spec, manifest)
                 if name == "font_build" and request.require_design_checks:
                     require(
                         bool(state.spec.required_characters),
@@ -441,7 +471,7 @@ class Service:
                     )
                     checked = self.store.load_masters(project_id, manifest, font)
                     for key, master_font in checked.items():
-                        report = analyze_font(master_font, state.spec)
+                        report = analyze_font(master_font, state.spec, key)
                         require(
                             report["checks_passed"],
                             "design_checks_failed",
@@ -465,10 +495,19 @@ class Service:
                     if not font.info.openTypeNameLicense:
                         result.warnings.append("No font license declared by its creator")
                     try:
-                        build, _ = compile_font(self.store, project_id, font, manifest, source, ["ttf"])
+                        build, binary_bytes = compile_font(
+                            self.store, project_id, font, manifest, source, ["ttf"]
+                        )
                         result.data["build"] = build
+                        if needs_variation(state.spec):
+                            attach_variation(
+                                result.data["design"], analyze_variation(binary_bytes, state.spec)
+                            )
                     except FontError as exc:
                         result.data.update(valid=False, errors=[{"code": exc.code, "message": str(exc)}])
+                        if needs_variation(state.spec):
+                            result.data["design"]["checks_passed"] = False
+                            result.data["design"]["scope"]["variation"] = "unavailable_compile_failed"
                     result.data["technical_valid"] = result.data["valid"]
                     result.summary = (
                         "Technical validation passed"
@@ -491,6 +530,7 @@ class Service:
                                 "artistic_approval",
                                 "reference_fidelity",
                                 "master_id",
+                                "scope",
                             )
                         }
                         result.data.update(
@@ -511,8 +551,26 @@ class Service:
                             )
                         result.warnings = result.warnings[:10]
                 else:
+                    if request.require_design_checks and needs_variation(state.spec):
+                        _, binary_bytes = compile_font(
+                            self.store,
+                            project_id,
+                            font,
+                            manifest,
+                            source,
+                            ["ttf"],
+                        )
+                        variation_report = analyze_variation(binary_bytes, state.spec)
+                        require(
+                            variation_report["checks_passed"],
+                            "design_checks_failed",
+                            f"Variation: {variation_report['counts']['issues']} design issues; run font_analyze",
+                        )
                     result.data, _ = compile_font(
                         self.store, project_id, font, manifest, source, request.formats, retain=True
+                    )
+                    result.data["design_gate"] = (
+                        "passed" if request.require_design_checks else "not_requested"
                     )
                     artifact = result.data["artifact_id"]
                     for fmt, info in result.data["files"].items():

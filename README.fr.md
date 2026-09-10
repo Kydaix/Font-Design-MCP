@@ -310,8 +310,9 @@ arbitraire, traçage d'image, adaptateurs d'éditeurs, collaboration réseau et 
 Ni hinting ni code de fonctions OpenType arbitraire ne sont exposés. Les aperçus de texte sont des spécimens
 sur une ligne, sans mise en page de paragraphes.
 
-**Á précomposé avec des composants est testé.** Le positionnement général des marques combinantes
-(`mark`/`mkmk`) et la couverture des écritures complexes ne sont pas annoncés. La conversion de courbes peut
+**Á précomposé avec des composants est testé.** Les marques combinantes latines avec ancres correspondantes
+sont contrôlées : la fonction `mark` doit être accessible dans les TTF et WOFF2, y compris variables et en cache.
+L'empilement des accents (`mkmk`) et les écritures complexes ne sont pas certifiés. La conversion de courbes peut
 faire légèrement différer les aperçus de sources des contours compilés ; le rendu FreeType non hinté
 ne garantit pas une identité avec le rendu natif du système.
 

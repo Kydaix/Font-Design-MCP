@@ -35,7 +35,10 @@ Use move_point(preserve_handles=true) for nodes, move_handle for linked cubic co
 Use compose_accent(auto_align=true) to keep accents and advances linked; detach_composition before local overrides.
 After each structural change run font_analyze, render_proof at common scale (including digits), then render_text at
 usage sizes with and without kerning. Correct shared causes, not entire glyphs blindly. Inspect the actual images.
-font_build(require_design_checks=true) gates declared checks across masters, not artistic quality or interpolation.
+Metric/stroke rules accept master_id or location (mutually exclusive); unscoped rules apply to every master.
+Declare variation_probes for stroke progression with axis_tag, ordered values, direction and optional minimum_change.
+font_analyze compiles location/variation checks and reports unmarked curve joins as review candidates, not errors.
+font_build(require_design_checks=true) gates declared checks across masters and sampled locations, not artistic quality.
 Technical validation is not artistic or human approval. Images are provided as MCP image content;
 whether a model sees them depends on the client. No external models, system fonts or network are used."""
 
