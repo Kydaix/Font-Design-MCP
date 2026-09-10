@@ -26,6 +26,8 @@ jobs:
       - run: uv run --frozen python scripts/check_distribution.py
       - run: uv run --frozen python scripts/test_wheel.py
       - run: uv run --frozen python scripts/build_mcpb.py
+      - name: Validate registry checksum for the bundle being published
+        run: uv run --frozen python scripts/check_registry.py
       - name: Checksums
         run: sha256sum dist/* > SHA256SUMS
       - name: Attach distributions to GitHub release
