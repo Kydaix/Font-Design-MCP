@@ -192,6 +192,10 @@ L'agent client prend les décisions créatives ; le serveur applique des opérat
 
 Conservez les hypothèses et corrections observées dans le journal de décisions du projet.
 
+La version de développement ajoute des contrôles de contours par défaut, des profils d'épaisseur
+perpendiculaires et des revues visuelles liées à une révision. `font_build` exporte une épreuve par défaut ;
+`purpose="release"` exige un contrat de revue complet. Voir le [guide qualité et livraison](docs/quality-release.fr.md).
+
 <details>
 <summary>Exemple : déplacer un point et comparer les révisions</summary>
 
@@ -247,7 +251,9 @@ données structurées, des résumés lisibles, les révisions, les avertissement
 | `render_glyph` | Rendre un glyphe avec repères, poignées et comparaison de révisions facultatifs |
 | `render_text` | Compiler, composer et rendre un texte à plusieurs tailles |
 | `reference_import` | Importer un PNG calibré depuis workspace/inbox comme référence immuable |
-| `font_analyze` | Contrôler les raccords lisses, la couverture, les chiffres et les cibles de dessin |
+| `font_analyze` | Contrôler l'encre visible, les dessins identiques, les croisements, la portée des contrôles et les profils |
+| `proof_review` | Enregistrer la revue de preuves immuables par l'agent et les choix intentionnels localisés |
+| `font_release_check` | Identifier les mesures, revues de glyphes/textes et défauts non traités sur tous les masters |
 | `render_proof` | Comparer plusieurs glyphes à échelle commune, y compris entre révisions |
 | `font_validate` | Vérifier géométrie, couverture Unicode, compilation et tables OpenType |
 | `font_build` | Exporter en TTF et/ou WOFF2 statique ou variable depuis une révision figée |

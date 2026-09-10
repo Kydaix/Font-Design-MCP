@@ -1,5 +1,6 @@
 """Application boundary shared by MCP and domain tests."""
 
+import hashlib
 import io
 import uuid
 from contextlib import ExitStack
@@ -12,6 +13,7 @@ from . import models as m
 from .build import compile_font
 from .design import (
     analyze_font,
+    applies_to_master,
     coverage,
     design_state,
     needs_variation,
@@ -32,6 +34,7 @@ from .domain import (
 from .proof import proof_frame, proof_view
 from .references import import_png, reference_frame
 from .render import glyph_frame, glyph_view, save_render, text_view
+from .review import record_review, release_check
 from .storage import Store
 from .telemetry import phase, profiled
 from .variation_design import analyze_variation, attach_variation
@@ -50,6 +53,10 @@ CAPABILITIES = {
     "svg_import": False,
     "reference_png_import": True,
     "design_diagnostics": True,
+    "default_outline_checks": True,
+    "normal_stroke_profiles": True,
+    "revision_bound_reviews": True,
+    "release_contract": True,
     "linked_accent_composition": True,
     "automatic_tracing": False,
     "otf": False,
@@ -127,10 +134,25 @@ TOOLS = {
     "font_analyze": (
         m.Analyze,
         False,
-        "Measure declared design rules, smooth joins, digit spacing and required coverage. "
+        "Check visible ink, matching outlines and self crossings by default; measure declared design rules, "
+        "normal stroke/counter profiles, smooth joins, digit spacing and required coverage. "
         "Rules accept master_id or a variable location; variation_probes measure stroke progression. "
         "Compiles only when location/variation checks are requested. Unmarked curve joins are review candidates. "
         "Returns localized issues and explicit scope, not artistic approval. detail=full includes measurements.",
+    ),
+    "proof_review": (
+        m.ProofReview,
+        False,
+        "Record an agent's visual review of immutable render report_uris from an exact revision. "
+        "Use verdict=revise for defects; accepted intentional findings require their finding_id and a reason. "
+        "Does not alter font sources or assert human approval. Inspect actual images before calling.",
+    ),
+    "font_release_check": (
+        m.ReleaseCheck,
+        False,
+        "Evaluate all masters, structural measurements, glyph review coverage, localized findings, "
+        "reference comparisons and shaped text reviews before release. Supply proof_review report_uris. "
+        "Returns actionable missing requirements; never certifies aesthetic perfection.",
     ),
     "reference_import": (
         m.ReferenceImport,
@@ -399,6 +421,7 @@ class Service:
                         "reference_ids": [r.id for r in state.references],
                         "rule_count": len(state.spec.metric_rules)
                         + len(state.spec.stroke_probes)
+                        + len(state.spec.stroke_profiles)
                         + len(state.spec.variation_probes),
                         "latest_decision": manifest["decisions"][-1:] or [],
                         "full_context": "project_inspect(detail=full)",
@@ -444,6 +467,9 @@ class Service:
                             "master_id",
                             "limitations",
                             "scope",
+                            "outline_integrity_passed",
+                            "design_coverage",
+                            "next_steps",
                         )
                     }
                     result.data.update(
@@ -460,124 +486,213 @@ class Service:
                     if report["checks_passed"]
                     else "Design issues found"
                 )
-            elif name in ("font_build", "font_validate"):
-                if name == "font_validate" or request.require_design_checks:
+            elif name == "proof_review":
+                result.data = record_review(self.store, project_id, revision, manifest, request)
+                result.summary = "Agent review recorded for immutable proofs; source revision unchanged"
+            elif name in ("font_build", "font_release_check"):
+                controlled = (
+                    name == "font_release_check"
+                    or request.require_design_checks
+                    or request.purpose == "release"
+                )
+                scope_error = None
+                try:
                     validate_rule_scopes(state.spec, manifest)
-                if name == "font_build" and request.require_design_checks:
-                    require(
-                        bool(state.spec.required_characters),
-                        "design_contract_missing",
-                        "Set design_spec.required_characters before using the export gate",
-                    )
-                    checked = self.store.load_masters(project_id, manifest, font)
-                    for key, master_font in checked.items():
-                        report = analyze_font(master_font, state.spec, key)
-                        require(
-                            report["checks_passed"],
-                            "design_checks_failed",
-                            f"Master {key}: {report['counts']['issues']} design issues; run font_analyze",
-                        )
+                except FontError as exc:
+                    if controlled:
+                        raise
+                    scope_error = str(exc)
+                checked = self.store.load_masters(project_id, manifest, fonts["default"])
                 locks.close()
-                if name == "font_validate":
-                    observations = validate_font(font)
-                    _, missing = coverage(font, state.spec, request.corpus)
-                    design_report = analyze_font(font, state.spec)
-                    result.data = {
-                        "review": "automatic",
-                        "valid": True,
-                        "errors": [],
-                        "observations": observations,
-                        "missing_codepoints": missing,
-                        "coverage_complete": not missing,
-                        "design": {**design_report, "master_id": "default"},
+                reports = {
+                    mid: analyze_font(f, m.DesignSpec() if scope_error else state.spec, mid)
+                    for mid, f in checked.items()
+                }
+                if scope_error:
+                    for report in reports.values():
+                        report["checks_passed"] = False
+                        report["issues"].insert(0, {"kind": "invalid_design_scope", "message": scope_error})
+                        report["counts"]["issues"] += 1
+                        report["issues"] = report["issues"][:2000]
+                        report["issues_truncated"] = report["counts"]["issues"] > len(report["issues"])
+                        report["scope"]["design_contract"] = "unavailable"
+                variation_report = None
+                binary_hash = None
+                needs_compilation = name == "font_release_check" or request.purpose == "release"
+                if needs_compilation or (not scope_error and needs_variation(state.spec)):
+                    _, binary_bytes = compile_font(
+                        self.store, project_id, checked["default"], manifest, source, ["ttf"]
+                    )
+                    binary_hash = hashlib.sha256(binary_bytes).hexdigest()
+                if not scope_error and needs_variation(state.spec):
+                    variation_report = analyze_variation(binary_bytes, state.spec)
+                    for report in reports.values():
+                        attach_variation(report, variation_report)
+                evidence = {}
+                for mid, report in reports.items():
+                    report["master_id"] = mid
+                    evidence[mid] = {
+                        "checks_passed": report["checks_passed"],
+                        "outline_integrity_passed": report["outline_integrity_passed"],
+                        "counts": report["counts"],
+                        "report_uri": self.store.save_report(project_id, revision, report),
                     }
-                    result.warnings = [f"Missing U+{u:04X}" for u in missing]
-                    if not font.info.openTypeNameLicense:
-                        result.warnings.append("No font license declared by its creator")
-                    try:
-                        build, binary_bytes = compile_font(
-                            self.store, project_id, font, manifest, source, ["ttf"]
-                        )
-                        result.data["build"] = build
-                        if needs_variation(state.spec):
-                            attach_variation(
-                                result.data["design"], analyze_variation(binary_bytes, state.spec)
-                            )
-                    except FontError as exc:
-                        result.data.update(valid=False, errors=[{"code": exc.code, "message": str(exc)}])
-                        if needs_variation(state.spec):
-                            result.data["design"]["checks_passed"] = False
-                            result.data["design"]["scope"]["variation"] = "unavailable_compile_failed"
-                    result.data["technical_valid"] = result.data["valid"]
+                readiness = None
+                if name == "font_release_check" or request.purpose == "release":
+                    readiness = release_check(
+                        self.store,
+                        project_id,
+                        revision,
+                        manifest,
+                        checked,
+                        state.spec,
+                        reports,
+                        request.review_uris,
+                        binary_hash,
+                    )
+                    readiness["analysis_reports"] = evidence
+                    readiness["report_uri"] = self.store.save_report(project_id, revision, readiness)
+                if name == "font_release_check":
+                    result.data = readiness
                     result.summary = (
-                        "Technical validation passed"
-                        if result.data["valid"]
-                        else "Technical validation failed"
+                        "Release contract satisfied" if readiness["ready"] else "Release requirements remain"
                     )
-                    if request.detail == "summary":
-                        report = self.store.save_report(
-                            project_id, revision, {**result.data, "warnings": result.warnings}
-                        )
-                        issues = [o for o in observations if "kind" in o or o.get("direction") == "zero"]
-                        result.data.pop("observations")
-                        result.data.pop("build", None)
-                        result.data["design"] = {
-                            k: result.data["design"][k]
-                            for k in (
-                                "checks_passed",
-                                "counts",
-                                "review",
-                                "artistic_approval",
-                                "reference_fidelity",
-                                "master_id",
-                                "scope",
-                            )
-                        }
-                        result.data.update(
-                            counts={
-                                "errors": len(result.data["errors"]),
-                                "warnings": len(issues) + len(result.warnings),
-                                "information": len(observations) - len(issues),
-                            },
-                            issues=issues[:10],
-                            truncated=len(issues) > 10 or len(result.warnings) > 10,
-                            report_uri=report,
-                        )
-                        if len(missing) > 10:
-                            result.data.update(
-                                missing_codepoints=missing[:10],
-                                missing_codepoint_count=len(missing),
-                                truncated=True,
-                            )
-                        result.warnings = result.warnings[:10]
                 else:
-                    if request.require_design_checks and needs_variation(state.spec):
-                        _, binary_bytes = compile_font(
-                            self.store,
-                            project_id,
-                            font,
-                            manifest,
-                            source,
-                            ["ttf"],
-                        )
-                        variation_report = analyze_variation(binary_bytes, state.spec)
+                    gated = request.require_design_checks or request.purpose == "release"
+                    if gated:
                         require(
-                            variation_report["checks_passed"],
-                            "design_checks_failed",
-                            f"Variation: {variation_report['counts']['issues']} design issues; run font_analyze",
+                            bool(state.spec.required_characters),
+                            "design_contract_missing",
+                            "Set design_spec.required_characters before using the export gate",
                         )
-                    result.data, _ = compile_font(
-                        self.store, project_id, font, manifest, source, request.formats, retain=True
+                        if variation_report is not None:
+                            require(
+                                variation_report["checks_passed"],
+                                "design_checks_failed",
+                                f"Variation: {variation_report['counts']['issues']} issues; read {evidence['default']['report_uri']}",
+                            )
+                        for mid, report in reports.items():
+                            require(
+                                report["checks_passed"],
+                                "design_checks_failed",
+                                f"Master {mid}: {report['counts']['issues']} issues; read {evidence[mid]['report_uri']}",
+                            )
+                    if readiness is not None:
+                        require(
+                            readiness["ready"],
+                            "release_not_ready",
+                            f"{len(readiness['reasons'])} release requirements remain; read {readiness['report_uri']}",
+                        )
+                    result.data, exported_bytes = compile_font(
+                        self.store,
+                        project_id,
+                        checked["default"],
+                        manifest,
+                        source,
+                        request.formats,
+                        retain=True,
                     )
-                    result.data["design_gate"] = (
-                        "passed" if request.require_design_checks else "not_requested"
+                    if readiness is not None:
+                        require(
+                            hashlib.sha256(exported_bytes).hexdigest() == binary_hash,
+                            "proof_binary_mismatch",
+                            "Export differs from the reviewed compiler output; regenerate proofs",
+                        )
+                    result.data.update(
+                        purpose=request.purpose,
+                        design_gate="passed" if gated else "not_requested",
+                        analysis_reports=evidence,
+                        release_status="contract_satisfied" if readiness is not None else "not_reviewed",
+                        artistic_approval=False,
                     )
+                    if readiness is not None:
+                        result.data["release_report_uri"] = readiness["report_uri"]
                     artifact = result.data["artifact_id"]
                     for fmt, info in result.data["files"].items():
                         info["uri"] = self.store.resource_uri(project_id, revision, artifact, f"font.{fmt}")
-                    result.data["report_uri"] = self.store.resource_uri(
-                        project_id, revision, artifact, "artifact.json"
+                    self.store.verify(project_id, revision)
+                    result.data["report_uri"] = self.store.save_report(
+                        project_id, revision, {"kind": "font_delivery", **result.data}
                     )
+                    result.summary = (
+                        "Release exported with evidence"
+                        if readiness is not None
+                        else "Proof exported; release review not asserted"
+                    )
+            elif name == "font_validate":
+                validate_rule_scopes(state.spec, manifest)
+                locks.close()
+                observations = validate_font(font)
+                _, missing = coverage(font, state.spec, request.corpus)
+                design_report = analyze_font(font, state.spec)
+                result.data = {
+                    "review": "automatic",
+                    "valid": True,
+                    "errors": [],
+                    "observations": observations,
+                    "missing_codepoints": missing,
+                    "coverage_complete": not missing,
+                    "outline_integrity_passed": design_report["outline_integrity_passed"],
+                    "release_status": "not_reviewed",
+                    "design": {**design_report, "master_id": "default"},
+                }
+                result.warnings = [f"Missing U+{u:04X}" for u in missing]
+                if not font.info.openTypeNameLicense:
+                    result.warnings.append("No font license declared by its creator")
+                try:
+                    build, binary_bytes = compile_font(
+                        self.store, project_id, font, manifest, source, ["ttf"]
+                    )
+                    result.data["build"] = build
+                    if needs_variation(state.spec):
+                        attach_variation(result.data["design"], analyze_variation(binary_bytes, state.spec))
+                except FontError as exc:
+                    result.data.update(valid=False, errors=[{"code": exc.code, "message": str(exc)}])
+                    if needs_variation(state.spec):
+                        result.data["design"]["checks_passed"] = False
+                        result.data["design"]["scope"]["variation"] = "unavailable_compile_failed"
+                result.data["technical_valid"] = result.data["valid"]
+                result.summary = (
+                    "Technical validation passed" if result.data["valid"] else "Technical validation failed"
+                )
+                if request.detail == "summary":
+                    report = self.store.save_report(
+                        project_id, revision, {**result.data, "warnings": result.warnings}
+                    )
+                    issues = [o for o in observations if "kind" in o or o.get("direction") == "zero"]
+                    result.data.pop("observations")
+                    result.data.pop("build", None)
+                    result.data["design"] = {
+                        k: result.data["design"][k]
+                        for k in (
+                            "checks_passed",
+                            "counts",
+                            "review",
+                            "artistic_approval",
+                            "reference_fidelity",
+                            "master_id",
+                            "scope",
+                            "outline_integrity_passed",
+                            "design_coverage",
+                        )
+                    }
+                    result.data.update(
+                        counts={
+                            "errors": len(result.data["errors"]),
+                            "warnings": len(issues) + len(result.warnings),
+                            "information": len(observations) - len(issues),
+                        },
+                        issues=issues[:10],
+                        truncated=len(issues) > 10 or len(result.warnings) > 10,
+                        report_uri=report,
+                    )
+                    if len(missing) > 10:
+                        result.data.update(
+                            missing_codepoints=missing[:10],
+                            missing_codepoint_count=len(missing),
+                            truncated=True,
+                        )
+                    result.warnings = result.warnings[:10]
             elif name in ("render_glyph", "render_text", "render_proof"):
                 sources = [(font, manifest, source)]
                 if request.compare_revision:
@@ -620,11 +735,23 @@ class Service:
                 result.data["images"] = []
                 for f, version, ufo in sources:
                     if name == "render_glyph":
+                        profiles = [
+                            p
+                            for p in design_state(version).spec.stroke_profiles
+                            if p.glyph_id == request.glyph_id and applies_to_master(p, master_id)
+                        ]
                         if reference is None:
-                            image, details = glyph_view(f, request.glyph_id, request, frame)
+                            image, details = glyph_view(
+                                f, request.glyph_id, request, frame, profiles=profiles
+                            )
                         else:
                             image, details = glyph_view(
-                                f, request.glyph_id, request, frame, (reference_image, reference)
+                                f,
+                                request.glyph_id,
+                                request,
+                                frame,
+                                (reference_image, reference),
+                                profiles=profiles,
                             )
                             details["reference"] = reference.model_dump(mode="json")
                             self.store.read_resource(

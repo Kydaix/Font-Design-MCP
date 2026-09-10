@@ -1,5 +1,6 @@
 """The public input contract. Coordinates use font units, baseline y=0, y upwards."""
 
+import math
 from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -337,6 +338,28 @@ class StrokeProbe(RuleScope):
     tolerance: Annotated[float, Field(ge=0.5, le=1000)] = 2
 
 
+class StrokeProfile(RuleScope):
+    """Sample perpendicular to a centerline; measure ink or a bounded counter, in font units."""
+
+    id: ID
+    glyph_id: GlyphID
+    start: tuple[Coord, Coord]
+    end: tuple[Coord, Coord]
+    samples: int = Field(default=5, ge=2, le=17)
+    region: Literal["ink", "counter"] = "ink"
+    minimum: Annotated[float, Field(gt=0, le=4000)]
+    maximum: Annotated[float, Field(gt=0, le=4000)]
+    max_ratio: Annotated[float, Field(ge=1, le=100)] | None = None
+
+    @model_validator(mode="after")
+    def profile_bounds(self):
+        if math.dist(self.start, self.end) < 0.0001:
+            raise ValueError("Stroke profile centerline must be at least 0.0001 font units long")
+        if self.minimum > self.maximum:
+            raise ValueError("Profile minimum must not exceed maximum")
+        return self
+
+
 class VariationProbe(Model):
     """Sample a declared stroke across an axis; this is not an optical weight estimate."""
 
@@ -371,11 +394,17 @@ class DesignSpec(Model):
     tangent_tolerance_degrees: Annotated[float, Field(gt=0, le=30)] = 3
     metric_rules: list[MetricRule] = Field(default_factory=list, max_length=64)
     stroke_probes: list[StrokeProbe] = Field(default_factory=list, max_length=128)
+    stroke_profiles: list[StrokeProfile] = Field(
+        default_factory=list, max_length=64, exclude_if=lambda v: not v
+    )
     variation_probes: list[VariationProbe] = Field(default_factory=list, max_length=32)
 
     @model_validator(mode="after")
     def unique_rules(self):
-        ids = [r.id for r in [*self.metric_rules, *self.stroke_probes, *self.variation_probes]]
+        ids = [
+            r.id
+            for r in [*self.metric_rules, *self.stroke_probes, *self.stroke_profiles, *self.variation_probes]
+        ]
         if len(ids) != len(set(ids)):
             raise ValueError("Design rule IDs must be unique")
         if any(0xD800 <= ord(ch) <= 0xDFFF for ch in self.required_characters):
@@ -424,7 +453,7 @@ class DrawingReference(Model):
 
 
 class DesignState(Model):
-    version: Literal[1] = 1
+    version: Literal[1, 2] = 1
     spec: DesignSpec = Field(default_factory=DesignSpec)
     references: list[DrawingReference] = Field(default_factory=list, max_length=64)
     composition_links: Annotated[
@@ -433,6 +462,8 @@ class DesignState(Model):
 
     @model_validator(mode="after")
     def unique_references(self):
+        if self.spec.stroke_profiles:
+            self.version = 2
         ids = [r.id for r in self.references]
         if len(ids) != len(set(ids)):
             raise ValueError("Drawing reference IDs must be unique")
@@ -526,6 +557,7 @@ class RenderGlyph(GlyphGet):
     guides: bool = True
     points: bool = True
     reference_id: ID | None = None
+    measurements: bool = False
 
 
 class ReferenceImport(WriteRef):
@@ -582,7 +614,26 @@ class Validate(ReadRef):
 
 class Build(ReadRef):
     require_design_checks: bool = False
+    purpose: Literal["proof", "release"] = "proof"
+    review_uris: list[Annotated[str, Field(max_length=250)]] = Field(default_factory=list, max_length=128)
     formats: list[Literal["ttf", "woff2"]] = Field(default=["ttf", "woff2"], min_length=1, max_length=2)
+
+
+class FindingResolution(Model):
+    finding_id: Annotated[str, Field(pattern=r"^[a-f0-9]{64}$")]
+    reason: Annotated[str, Field(min_length=12, max_length=500)]
+
+
+class ProofReview(ReadRef):
+    revision: Revision
+    proof_uris: list[Annotated[str, Field(max_length=250)]] = Field(min_length=1, max_length=8)
+    verdict: Literal["accept", "revise"]
+    observation: Annotated[str, Field(min_length=20, max_length=4000)]
+    resolutions: list[FindingResolution] = Field(default_factory=list, max_length=128)
+
+
+class ReleaseCheck(ReadRef):
+    review_uris: list[Annotated[str, Field(max_length=250)]] = Field(default_factory=list, max_length=128)
 
 
 class Restore(WriteRef):

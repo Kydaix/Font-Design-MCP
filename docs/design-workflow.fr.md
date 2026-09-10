@@ -5,6 +5,10 @@ pas une vectorisation automatique, une reconnaissance du style ou une garantie d
 Le modèle client doit réellement recevoir et examiner les images. Les particularités voulues du dessin
 ne doivent pas être confondues avec des erreurs.
 
+La version de développement complète ce parcours par les [contrôles par défaut, profils perpendiculaires
+et preuves de livraison](quality-release.fr.md). Les profils utilisent le schéma 4 ; les anciens projets
+restent lisibles. Les revues se rattachent à une révision exacte sans modifier ses sources.
+
 ## Parcours conseillé
 
 Définir d'abord quelques glyphes structurants, **dont des chiffres**, avec `project_create(design_spec=...)`
