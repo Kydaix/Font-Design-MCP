@@ -22,7 +22,9 @@ A local MCP server for AI-assisted type design, from vector outlines to TTF and 
 
 ## Get started
 
-Version **0.4.3** adds installation directly from GitHub, with automatic client detection.
+Version **0.5.0** adds calibrated visual references, design checks, safe curve editing, and linked accents.
+See the [release notes](docs/releases/v0.5.0.md) and [reference-driven design guide](docs/design-workflow.md).
+Installation runs directly from GitHub, with automatic client detection.
 With **Node.js 20+ and Git**, run:
 
 ```sh
@@ -51,7 +53,7 @@ Previous runtimes are retained for running clients and configuration backups.
 The installed runtime survives removal of the npm cache. Remove its MCP entry in a client to disconnect it;
 font projects remain in the workspace.
 The MCP is distributed through GitHub, without publishing to PyPI or npm. Python dependencies still
-download from their package index on first installation. Pin a checkout with `github:Kydaix/Font-Design-MCP#v0.4.3`.
+download from their package index on first installation. Pin a checkout with `github:Kydaix/Font-Design-MCP#v0.5.0`.
 
 For manual setup, `font-design-mcp config` prints JSON using the versioned GitHub release wheel;
 `config --from /absolute/path/package.whl` uses a downloaded wheel. Neither command edits client files.
