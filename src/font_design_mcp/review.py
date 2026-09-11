@@ -38,6 +38,18 @@ def proof_scope(store, uri, project_id, revision, manifest, allow_incomplete=Fal
     )
     glyphs, location, master_id = [], None, parameters.get("master_id", "default")
     if "text" in parameters:
+        usage = proof.get("usage", {})
+        require(
+            allow_incomplete
+            or (
+                usage.get("version") == 1
+                and usage.get("ink_glyphs")
+                and usage.get("glyph_pairs")
+                and set(parameters["sizes"]) <= set(usage.get("ink_sizes", []))
+            ),
+            "incomplete_proof",
+            "Usage evidence needs visible shaped glyphs in context at every requested size; render words, not whitespace or isolated characters",
+        )
         defaults = {a["tag"]: a["default"] for a in manifest.get("variation", {}).get("axes", [])}
         location = {**defaults, **parameters.get("location", {})}
         masters = manifest.get("variation", {}).get("masters", [{"id": "default", "location": {}}])
@@ -60,6 +72,8 @@ def proof_scope(store, uri, project_id, revision, manifest, allow_incomplete=Fal
         "kern": parameters.get("kern"),
         "reference_id": parameters.get("reference_id"),
         "binary_sha256": proof.get("build", {}).get("files", {}).get("ttf", {}).get("sha256"),
+        "usage": proof.get("usage", {}),
+        "text": parameters.get("text", ""),
     }
 
 
@@ -93,6 +107,8 @@ def release_check(
     """Evaluate requirements without mutating sources or silently waiving review candidates."""
     reviewed = {mid: set() for mid in fonts}
     usage = {mid: {True: set(), False: set()} for mid in fonts}
+    context = {mid: {True: {}, False: {}} for mid in fonts}
+    texts = {mid: {True: {}, False: {}} for mid in fonts}
     reference_ids, locations, resolutions = set(), [], {}
     reasons = []
     for uri in dict.fromkeys(review_uris):
@@ -123,6 +139,12 @@ def release_check(
                 coverage[mid].update(evidence["glyphs"])
                 if evidence["kind"] == "text":
                     usage[mid][evidence["kern"]].update(evidence["sizes"])
+                    for size in evidence["usage"]["ink_sizes"]:
+                        scale = "small" if size <= 32 else "large" if size >= 48 else "medium"
+                        context[mid][evidence["kern"]].setdefault(scale, set()).update(
+                            evidence["usage"]["ink_glyphs"]
+                        )
+                        texts[mid][evidence["kern"]].setdefault(scale, set()).add(evidence["text"])
                 if mid == "default" and evidence["reference_id"]:
                     reference_ids.add(evidence["reference_id"])
             if evidence["location"] is not None:
@@ -151,6 +173,11 @@ def release_check(
         }
         unreviewed = sorted(required - reviewed[mid])
         shape_missing = report["design_coverage"]["unprobed_structural_glyphs"]
+        region_missing = report["design_coverage"].get("unmeasured_regions", [])
+        if region_missing:
+            reasons.append(
+                {"kind": "regional_measurements_missing", "master_id": mid, "regions": region_missing}
+            )
         unresolved = []
         for finding in report["review_candidates"]:
             identifier = finding["finding_id"]
@@ -188,6 +215,35 @@ def release_check(
                         "message": "Review shaped text at <=32 px and >=48 px, with and without kerning",
                     }
                 )
+            for scale in ("small", "large"):
+                absent = sorted(
+                    set(report["design_coverage"]["structural_glyphs"]) - context[mid][kern].get(scale, set())
+                )
+                if absent:
+                    reasons.append(
+                        {
+                            "kind": "text_glyph_coverage_missing",
+                            "master_id": mid,
+                            "kern": kern,
+                            "scale": scale,
+                            "glyphs": absent,
+                        }
+                    )
+                missing_texts = [
+                    t
+                    for t in spec.usage_texts
+                    if not any(t in text for text in texts[mid][kern].get(scale, set()))
+                ]
+                if missing_texts:
+                    reasons.append(
+                        {
+                            "kind": "usage_sequences_missing",
+                            "master_id": mid,
+                            "kern": kern,
+                            "scale": scale,
+                            "texts": missing_texts,
+                        }
+                    )
         masters[mid] = {
             "counts": report["counts"],
             "checks_passed": report["checks_passed"],
@@ -209,6 +265,17 @@ def release_check(
     for reference in manifest.get("design", {}).get("references", []):
         if reference["id"] not in reference_ids:
             reasons.append({"kind": "reference_comparison_missing", "reference_id": reference["id"]})
+    if manifest.get("design", {}).get("references"):
+        known = {o.glyph_id for o in spec.glyph_origins}
+        missing_origins = sorted(set(reports["default"]["design_coverage"]["structural_glyphs"]) - known)
+        if missing_origins:
+            reasons.append(
+                {
+                    "kind": "reference_origins_missing",
+                    "glyphs": missing_origins,
+                    "message": "Record which structural shapes were observed versus extrapolated",
+                }
+            )
     for axis in manifest.get("variation", {}).get("axes", []):
         if not any(
             axis["minimum"] < loc.get(axis["tag"], axis["default"]) < axis["maximum"] for loc in locations

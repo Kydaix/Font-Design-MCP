@@ -4,6 +4,7 @@ from . import models as m
 from .domain import metrics, require
 from .geometry import FlattenPen, filled_spans, join_issues
 from .quality import finding_id, measure_profile, outline_findings
+from .regions import anatomy_candidates, region_coverage
 
 
 def design_state(manifest):
@@ -15,7 +16,7 @@ def applies_to_master(rule, master_id):
 
 
 def needs_variation(spec):
-    return bool(spec.variation_probes) or any(
+    return bool(spec.variation_probes or spec.variation_profiles) or any(
         r.location is not None for r in [*spec.metric_rules, *spec.stroke_probes, *spec.stroke_profiles]
     )
 
@@ -38,7 +39,7 @@ def validate_rule_scopes(spec, manifest):
             "Design rule location has an unknown axis or is outside its range",
         )
 
-    for rule in [*spec.metric_rules, *spec.stroke_probes, *spec.stroke_profiles]:
+    for rule in [*spec.metric_rules, *spec.stroke_probes, *spec.stroke_profiles, *spec.regions]:
         require(
             rule.master_id is None or rule.master_id in masters,
             "invalid_input",
@@ -46,14 +47,14 @@ def validate_rule_scopes(spec, manifest):
         )
         if rule.location is not None:
             location_valid(rule.location)
-    for probe in spec.variation_probes:
+    for probe in [*spec.variation_probes, *spec.variation_profiles]:
         for value in probe.values:
             location_valid({**probe.location, probe.axis_tag: value})
 
 
 def coverage(font, spec, corpus=""):
     cmap = {u: g.name for g in font for u in g.unicodes}
-    required = set(map(ord, spec.required_characters + corpus))
+    required = set(map(ord, spec.required_characters + corpus + "".join(spec.usage_texts)))
     if spec.digit_spacing != "unspecified":
         required.update(range(48, 58))
     return cmap, sorted(required - set(cmap))
@@ -97,6 +98,7 @@ def analyze_font(font, spec, master_id="default"):
         else:
             candidates.append(finding)
     smooth_count = 0
+    candidates.extend(anatomy_candidates(font))
     for name in spec.reference_glyphs:
         if name not in font:
             issues.append(
@@ -218,6 +220,7 @@ def analyze_font(font, spec, master_id="default"):
             probe.tolerance,
             axis=probe.axis,
             position=probe.position,
+            span_index=probe.span_index,
             spans=[list(pair) for pair in spans[:64]],
             span_count=len(spans),
             spans_truncated=len(spans) > 64,
@@ -260,7 +263,14 @@ def analyze_font(font, spec, master_id="default"):
         set(spec.reference_glyphs)
         | {cmap[ord(c)] for c in "HOnosaASUKMNVRWXYkmy0123456789" if ord(c) in cmap}
     )
+    regions = region_coverage(font, spec, measurements, master_id)
+    grouped = {}
+    for row in candidates.items:
+        grouped.setdefault(row["kind"], []).append(row["finding_id"])
+    from .planning import evidence_plan
+
     return {
+        "evidence_plan": evidence_plan(font, spec, regions, structural),
         "review": "automatic",
         "artistic_approval": False,
         "reference_fidelity": "not_assessed",
@@ -268,6 +278,8 @@ def analyze_font(font, spec, master_id="default"):
         "coverage_complete": not missing,
         "outline_integrity_passed": outline_errors == 0 and outline_scope["complete"],
         "design_coverage": {
+            "regions": regions,
+            "unmeasured_regions": [r["id"] for r in regions if not r["covered"]],
             "measured_glyphs": measured,
             "shape_measured_glyphs": shape_measured,
             "unprobed_reference_glyphs": unprobed_references,
@@ -300,6 +312,9 @@ def analyze_font(font, spec, master_id="default"):
             "review_candidates": len(candidates),
         },
         "review_candidates": candidates.items,
+        "review_groups": [
+            {"kind": kind, "count": len(ids), "finding_ids": ids} for kind, ids in sorted(grouped.items())
+        ],
         "review_candidates_truncated": len(candidates.items) < len(candidates),
         "scope": {
             "master_id": master_id,

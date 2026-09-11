@@ -16,13 +16,14 @@ from importlib.metadata import distributions, version
 from filelock import FileLock, Timeout
 from fontTools.ttLib import TTFont
 
+from .binary_metadata import complete_variable_metadata
 from .domain import FontError, require
 from .layout import compiler_font, validate_latin_marks
 from .storage import digest_tree, files_checked, read_json, safe_path, write_json
 from .telemetry import count, phase
 from .variable import validate_variable_binary, write_designspace
 
-CACHE_POLICY = "fontmake-ttf-variable-languagesystems-latin-marks-v3"
+CACHE_POLICY = "fontmake-ttf-variable-languagesystems-latin-marks-stat-v5"
 CACHE_LIMIT = 128_000_000
 
 
@@ -218,6 +219,9 @@ def _compile_font(store, project_id, font, manifest, source, formats, artifacts,
     ttf = stage / "font.ttf"
     require(ttf.is_file() and 0 < ttf.stat().st_size <= 16_000_000, "build_failed", "Invalid compiler output")
     with TTFont(ttf, lazy=False, recalcTimestamp=False) as binary:
+        complete_variable_metadata(binary, configuration)
+        if configuration:
+            binary.save(ttf)
         validate_variable_binary(binary, configuration)
         layout_report = validate_latin_marks(binary, font)
         required = {"head", "hhea", "maxp", "OS/2", "hmtx", "cmap", "name", "post", "glyf", "loca"}

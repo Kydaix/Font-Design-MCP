@@ -15,7 +15,7 @@ from PIL import Image, ImageChops, ImageDraw, ImageFilter
 
 from .domain import metrics, require
 from .geometry import FlattenPen
-from .quality import measure_profile
+from .quality import expects_ink, has_ink, measure_profile
 from .storage import safe_path, write_json
 
 ENGINE = (
@@ -38,6 +38,28 @@ def glyph_view(font, name, request, frame, reference=None, profiles=()):
 
         image = reference_layer(reference[0], reference[1], w, h, scale, tx, ty)
     image.paste(layer, (0, 0), layer)
+    comparison = None
+    if reference is not None:
+        from .references import warped_reference
+
+        original = warped_reference(reference[0], reference[1], w, h, scale, tx, ty)
+        reference_mask = original.convert("L").point(lambda v: 255 if v < 160 else 0)
+        outline_mask = layer.getchannel("A").point(lambda v: 255 if v >= 128 else 0)
+        intersection = ImageChops.darker(reference_mask, outline_mask)
+        union = ImageChops.lighter(reference_mask, outline_mask)
+        union_pixels = union.histogram()[255]
+        comparison = {
+            "intersection_over_union": intersection.histogram()[255] / union_pixels if union_pixels else None,
+            "reference_ink_pixels": reference_mask.histogram()[255],
+            "outline_ink_pixels": outline_mask.histogram()[255],
+            "threshold": 160,
+            "scope": "Fixed calibration silhouette overlap at this raster size; not artistic approval or OCR",
+        }
+        if getattr(request, "comparison_mode", "overlay") == "difference":
+            image = Image.new("RGB", (w, h), "white")
+            image.paste((0, 150, 190), (0, 0), reference_mask)
+            image.paste((200, 40, 130), (0, 0), outline_mask)
+            image.paste((25, 25, 30), (0, 0), intersection)
     draw = ImageDraw.Draw(image)
 
     def xy(x, y):
@@ -105,6 +127,7 @@ def glyph_view(font, name, request, frame, reference=None, profiles=()):
         "origin_pixel": xy(0, 0),
         "component_points": "Inspect base glyph for component controls",
         "profile_measurements": measurements,
+        "reference_comparison": comparison,
     }
 
 
@@ -173,13 +196,36 @@ def text_view(binary_path, request, vertical_frame):
         missing = sorted({ord(ch) for ch in request.text if ord(ch) not in cmap})
         warnings = [f"Missing U+{u:04X}; no system font substitution" for u in missing]
         pen = FreeTypePen(glyphset)
-        x, y = 0, 0
+        ink_cache, shaped_names, pairs = {}, [], set()
+        previous = None
+        work = [2_000_000]
+        x, y, point_count = 0, 0, 0
         for item in positions:
-            g = glyphset[order[item["gid"]]]
+            name = order[item["gid"]]
+            g = glyphset[name]
+            if name not in ink_cache:
+                require(point_count < 2_000_000, "diagnostic_limit", "Text outline budget exceeded")
+                flattened = FlattenPen(
+                    glyphset, tolerance=min(0.25, upm / 4000), budget=min(20000, 2_000_000 - point_count)
+                )
+                try:
+                    g.draw(flattened)
+                    point_count += flattened.count
+                    ink_cache[name] = has_ink(flattened.contours, work)
+                except ValueError as exc:
+                    require(False, "diagnostic_limit", str(exc))
+            if ink_cache[name] and name != ".notdef":
+                shaped_names.append(name)
+                if previous is not None:
+                    pairs.add((previous, name))
+                previous = name
+            else:
+                previous = None
             g.draw(TransformPen(pen, (1, 0, 0, 1, x + item["x_offset"], y + item["y_offset"])))
             x += item["x_advance"]
             y += item["y_advance"]
         rows = []
+        ink_sizes = []
         for size in request.sizes:
             scale = size / upm
             height = max(48, int((top - bottom) * scale) + 44)
@@ -193,6 +239,8 @@ def text_view(binary_path, request, vertical_frame):
                     f"Specimen clipped vertically at {size}px; inspect glyph and vertical metrics"
                 )
             layer = pen.image(request.width, height, transform=(scale, 0, 0, scale, 20, 20 - bottom * scale))
+            if layer.getchannel("A").getbbox():
+                ink_sizes.append(size)
             image.paste("white" if request.dark else "black", (0, 0), layer.getchannel("A"))
             ImageDraw.Draw(image).text(
                 (4, 4),
@@ -213,6 +261,13 @@ def text_view(binary_path, request, vertical_frame):
         "advance_units": [sum(i["x_advance"] for i in positions), sum(i["y_advance"] for i in positions)],
         "warnings": warnings,
         "harfbuzz": hb.version_string(),
+        "usage": {
+            "version": 1,
+            "ink_glyphs": sorted(set(shaped_names)),
+            "visible_codepoints": sorted({ord(c) for c in request.text if expects_ink(ord(c))}),
+            "glyph_pairs": [list(p) for p in sorted(pairs)],
+            "ink_sizes": ink_sizes,
+        },
     }
 
 

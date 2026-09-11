@@ -172,6 +172,47 @@ class StrokePath(FilledPath):
     join: Literal["round", "bevel", "miter"] = "round"
 
 
+class NetworkStroke(Model):
+    id: Annotated[str, Field(pattern=r"^[a-zA-Z_][a-zA-Z0-9_]{0,15}$")]
+    path: Annotated[str, Field(min_length=1, max_length=16000)]
+    width_parameter: ID
+    cap: Literal["round", "butt", "square"] = "butt"
+    join: Literal["round", "bevel", "miter"] = "miter"
+
+
+class StrokeNetwork(Model):
+    parameters: dict[ID, Annotated[float, Field(gt=0, le=2000)]] = Field(min_length=1, max_length=16)
+    strokes: list[NetworkStroke] = Field(min_length=1, max_length=16)
+    horizontal_scale: Annotated[float, Field(gt=0, le=4)] = 1
+    origin_x: Coord = 0
+    advance: Advance = 600
+
+    @model_validator(mode="after")
+    def links(self):
+        if len({s.id for s in self.strokes}) != len(self.strokes) or any(
+            s.width_parameter not in self.parameters for s in self.strokes
+        ):
+            raise ValueError("Network stroke IDs must be unique and reference existing width parameters")
+        return self
+
+
+class SetStrokeNetwork(Model):
+    op: Literal["stroke_network"]
+    network: StrokeNetwork
+    replace: bool = False
+
+
+class UpdateStrokeNetwork(Model):
+    op: Literal["update_stroke_network"]
+    parameters: dict[ID, Annotated[float, Field(gt=0, le=2000)]] = Field(default_factory=dict, max_length=16)
+    horizontal_scale: Annotated[float, Field(gt=0, le=4)] | None = None
+    advance: Advance | None = None
+
+
+class DetachStrokeNetwork(Model):
+    op: Literal["detach_stroke_network"]
+
+
 class Primitive(Model):
     op: Literal["primitive"]
     shape: Literal["rectangle", "ellipse"]
@@ -213,6 +254,9 @@ Edit = Annotated[
     | ReplaceGlyph
     | FilledPath
     | StrokePath
+    | SetStrokeNetwork
+    | UpdateStrokeNetwork
+    | DetachStrokeNetwork
     | Primitive
     | Duplicate
     | ComposeAccent,
@@ -384,6 +428,55 @@ class VariationProbe(Model):
         return self
 
 
+class DesignRegion(RuleScope):
+    """A declared area in normalized visible bounds; useful for non-Latin and alternate anatomy."""
+
+    id: ID
+    glyph_id: GlyphID
+    bounds: tuple[
+        Annotated[float, Field(ge=0, le=1)],
+        Annotated[float, Field(ge=0, le=1)],
+        Annotated[float, Field(ge=0, le=1)],
+        Annotated[float, Field(ge=0, le=1)],
+    ]
+    role: Literal["stem", "branch", "junction", "counter", "curve", "terminal"]
+    minimum_samples: int = Field(default=2, ge=1, le=17)
+
+    @model_validator(mode="after")
+    def region_bounds(self):
+        if self.location is not None or self.bounds[0] >= self.bounds[2] or self.bounds[1] >= self.bounds[3]:
+            raise ValueError("Regions require ordered bounds and a source master scope")
+        return self
+
+
+class VariationProfile(StrokeProfile):
+    axis_tag: AxisTag
+    values: list[AxisValue] = Field(min_length=2, max_length=9)
+    location: Location = Field(default_factory=dict)
+    direction: Literal["nondecreasing", "nonincreasing"] = "nondecreasing"
+    tolerance: Annotated[float, Field(ge=0.5, le=1000)] = 2
+    minimum_change: Annotated[float, Field(ge=0, le=4000)] = 0
+
+    @model_validator(mode="after")
+    def variable_scope(self):
+        if (
+            self.master_id is not None
+            or self.axis_tag in self.location
+            or any(a >= b for a, b in zip(self.values, self.values[1:]))
+        ):
+            raise ValueError(
+                "Variable profiles require strictly ordered values, no master and no duplicate sampled axis"
+            )
+        return self
+
+
+class GlyphOrigin(Model):
+    glyph_id: GlyphID
+    status: Literal["observed", "extrapolated", "original"]
+    reference_ids: list[ID] = Field(default_factory=list, max_length=16)
+    observation: Annotated[str, Field(min_length=20, max_length=1000)]
+
+
 class DesignSpec(Model):
     required_characters: ShortText = ""
     reference_glyphs: list[GlyphID] = Field(default_factory=list, max_length=64)
@@ -395,18 +488,37 @@ class DesignSpec(Model):
     metric_rules: list[MetricRule] = Field(default_factory=list, max_length=64)
     stroke_probes: list[StrokeProbe] = Field(default_factory=list, max_length=128)
     stroke_profiles: list[StrokeProfile] = Field(
-        default_factory=list, max_length=64, exclude_if=lambda v: not v
+        default_factory=list, max_length=512, exclude_if=lambda v: not v
     )
     variation_probes: list[VariationProbe] = Field(default_factory=list, max_length=32)
+    variation_profiles: list[VariationProfile] = Field(
+        default_factory=list, max_length=128, exclude_if=lambda v: not v
+    )
+    regions: list[DesignRegion] = Field(default_factory=list, max_length=512, exclude_if=lambda v: not v)
+    glyph_origins: list[GlyphOrigin] = Field(default_factory=list, max_length=512, exclude_if=lambda v: not v)
+    usage_texts: list[Annotated[str, Field(min_length=2, max_length=80)]] = Field(
+        default_factory=list, max_length=64, exclude_if=lambda v: not v
+    )
 
     @model_validator(mode="after")
     def unique_rules(self):
         ids = [
             r.id
-            for r in [*self.metric_rules, *self.stroke_probes, *self.stroke_profiles, *self.variation_probes]
+            for r in [
+                *self.metric_rules,
+                *self.stroke_probes,
+                *self.stroke_profiles,
+                *self.variation_probes,
+                *self.variation_profiles,
+                *self.regions,
+            ]
         ]
         if len(ids) != len(set(ids)):
             raise ValueError("Design rule IDs must be unique")
+        if len({o.glyph_id for o in self.glyph_origins}) != len(self.glyph_origins):
+            raise ValueError("Glyph origins must be unique")
+        if any(not t.strip() for t in self.usage_texts):
+            raise ValueError("Usage texts must contain visible characters")
         if any(0xD800 <= ord(ch) <= 0xDFFF for ch in self.required_characters):
             raise ValueError("Required characters must be Unicode scalars")
         if len(set(self.reference_glyphs)) != len(self.reference_glyphs):
@@ -440,9 +552,22 @@ class DrawingReference(Model):
     height: int = Field(ge=1, le=2048)
     image_to_font: Matrix
     encoded_bytes: int = Field(ge=1, le=2_000_000)
+    source_crop: tuple[int, int, int, int] | None = Field(default=None, exclude_if=lambda v: v is None)
+    source_page_uri: str | None = Field(default=None, max_length=250, exclude_if=lambda v: v is None)
 
     @model_validator(mode="after")
     def calibration(self):
+        if (self.source_crop is None) != (self.source_page_uri is None):
+            raise ValueError("A crop requires its preserved source page")
+        if self.source_crop is not None:
+            x0, y0, x1, y1 = self.source_crop
+            if not (
+                0 <= x0 < x1 <= 2048
+                and 0 <= y0 < y1 <= 2048
+                and x1 - x0 == self.width
+                and y1 - y0 == self.height
+            ):
+                raise ValueError("Invalid source crop dimensions")
         a, b, c, d, x, y = self.image_to_font
         if abs(a * d - b * c) <= 1e-8:
             raise ValueError("Reference calibration must be invertible")
@@ -453,7 +578,7 @@ class DrawingReference(Model):
 
 
 class DesignState(Model):
-    version: Literal[1, 2] = 1
+    version: Literal[1, 2, 3] = 1
     spec: DesignSpec = Field(default_factory=DesignSpec)
     references: list[DrawingReference] = Field(default_factory=list, max_length=64)
     composition_links: Annotated[
@@ -463,12 +588,26 @@ class DesignState(Model):
     @model_validator(mode="after")
     def unique_references(self):
         if self.spec.stroke_profiles:
-            self.version = 2
+            self.version = max(self.version, 2)
+        if (
+            self.spec.variation_profiles
+            or self.spec.regions
+            or self.spec.glyph_origins
+            or self.spec.usage_texts
+        ):
+            self.version = 3
+        if any(r.source_crop is not None for r in self.references):
+            self.version = 3
         ids = [r.id for r in self.references]
         if len(ids) != len(set(ids)):
             raise ValueError("Drawing reference IDs must be unique")
         if sum(r.encoded_bytes for r in self.references) > 32_000_000:
             raise ValueError("Drawing references exceed the 32 MB project budget")
+        for origin in self.spec.glyph_origins:
+            if not set(origin.reference_ids) <= set(ids) or (
+                origin.status == "observed" and not origin.reference_ids
+            ):
+                raise ValueError("Observed origins require existing imported references")
         return self
 
 
@@ -492,6 +631,14 @@ class Page(ReadRef):
     include_total: bool = False
     offset: int = Field(default=0, ge=0, le=100000)
     limit: int = Field(default=50, ge=1, le=100)
+
+
+class Inspect(Page):
+    master_id: ID = "default"
+    sections: list[Literal["metadata", "design", "glyphs", "spacing", "compositions", "history"]] | None = (
+        Field(default=None, max_length=6)
+    )
+    glyph_ids: list[GlyphID] = Field(default_factory=list, max_length=32)
 
 
 class WriteRef(ProjectRef):
@@ -558,6 +705,7 @@ class RenderGlyph(GlyphGet):
     points: bool = True
     reference_id: ID | None = None
     measurements: bool = False
+    comparison_mode: Literal["overlay", "difference"] = "overlay"
 
 
 class ReferenceImport(WriteRef):
@@ -568,11 +716,21 @@ class ReferenceImport(WriteRef):
     label: Annotated[str, Field(max_length=200)] = ""
     replace: bool = False
     image_mode: Literal["inline", "resource"] = "inline"
+    crop: (
+        tuple[
+            Annotated[int, Field(ge=0, le=2048)],
+            Annotated[int, Field(ge=0, le=2048)],
+            Annotated[int, Field(ge=1, le=2048)],
+            Annotated[int, Field(ge=1, le=2048)],
+        ]
+        | None
+    ) = None
 
 
 class Analyze(ReadRef):
     master_id: ID = "default"
     detail: Literal["summary", "full"] = "summary"
+    interpolation: bool = False
 
 
 class RenderProof(ReadRef):

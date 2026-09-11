@@ -155,6 +155,8 @@ def element_ids(g):
 
 
 def edit_glyph(font, request, composition_links=None):
+    from .construction import NETWORK_KEY, edit_network
+
     name = request.glyph_id
     require(
         (name not in font) == request.create,
@@ -166,12 +168,32 @@ def edit_glyph(font, request, composition_links=None):
     touched = []
     points_by_id = None
     for op in request.operations:
+        if NETWORK_KEY in g.lib:
+            require(
+                isinstance(
+                    op,
+                    (
+                        m.SetStrokeNetwork,
+                        m.UpdateStrokeNetwork,
+                        m.DetachStrokeNetwork,
+                        m.PutAnchor,
+                        m.SetUnicodes,
+                    ),
+                ),
+                "linked_construction",
+                "Update the stroke network or detach it before editing raw contours",
+            )
         if composition_links is not None and name in composition_links:
             require(
                 isinstance(op, (m.DetachComposition, m.ComposeAccent, m.SetUnicodes, m.PutAnchor)),
                 "linked_composition",
                 f"Detach linked composition {name} before editing its outline",
             )
+        if isinstance(op, (m.SetStrokeNetwork, m.UpdateStrokeNetwork, m.DetachStrokeNetwork)):
+            edit_network(g, op)
+            points_by_id = None
+            touched.extend(sorted(element_ids(g)))
+            continue
         if isinstance(op, m.DetachComposition):
             require(
                 composition_links is not None and name in composition_links,
@@ -327,6 +349,8 @@ def transform_glyph(g, matrix, contour_ids=None):
 
 
 def edit_spacing(font, request, composition_links=None):
+    from .construction import NETWORK_KEY
+
     touched = []
     for op in request.operations:
         if isinstance(op, (m.SetAdvance, m.Bearings)):
@@ -337,8 +361,15 @@ def edit_spacing(font, request, composition_links=None):
             )
             require(op.glyph_id in font, "missing_reference", f"Missing glyph {op.glyph_id}")
             g = font[op.glyph_id]
+            require(
+                NETWORK_KEY not in g.lib or isinstance(op, m.SetAdvance),
+                "linked_construction",
+                "Detach the stroke network before moving bearings; widths remain parameter-controlled",
+            )
             if isinstance(op, m.SetAdvance):
                 g.width = op.value
+                if NETWORK_KEY in g.lib:
+                    g.lib[NETWORK_KEY]["advance"] = op.value
             else:
                 b = g.getBounds(font)
                 require(b is not None, "invalid_geometry", "Empty glyph has no side bearings; set advance")
@@ -393,7 +424,20 @@ def validate_font(font):
     for g in font:
         m.GlyphGet(project_id="0" * 32, glyph_id=g.name)
         data = glyph_data(g)  # Revalidate also after affine transforms and external load.
-        require(not g.lib and not g.image.fileName, "capability_unavailable", "Glyph lib/images unsupported")
+        from .construction import NETWORK_KEY
+
+        require(
+            set(g.lib) <= {NETWORK_KEY} and not g.image.fileName,
+            "capability_unavailable",
+            "Arbitrary glyph lib/images unsupported",
+        )
+        if NETWORK_KEY in g.lib:
+            network = m.StrokeNetwork.model_validate(g.lib[NETWORK_KEY])
+            require(
+                network.advance == g.width,
+                "invalid_geometry",
+                "Stroke network advance differs from glyph advance",
+            )
         ids = [
             v.id
             for v in [
