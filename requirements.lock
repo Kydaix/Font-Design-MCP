@@ -353,6 +353,10 @@ mcp-types==2.2.0 \
     --hash=sha256:d3ed53703ddd10d9c6399f29d322bb66f3f67ab41348ac8556ba23e07fedefad \
     --hash=sha256:ea476b73ee86709ab5abc9452385ed36cc05907e582355622e294595c9a04f13
     # via mcp
+munkres==1.1.4 \
+    --hash=sha256:6b01867d4a8480d865aea2326e4b8f7c46431e9e55b4a2e32d989307d7bced2a \
+    --hash=sha256:fc44bf3c3979dada4b6b633ddeeb8ffbe8388ee9409e4d4e8310c2da1792db03
+    # via font-design-mcp
 openstep-plist==0.5.2 \
     --hash=sha256:1da0be3ae7e67c35a579e39727d78bb12ef81fcfccaca68711215e2b6f61ac3a \
     --hash=sha256:1e5444250b53a04fb01024b471e0a46cc7e658f031955301b6812c6eb3894b8f \

@@ -11,6 +11,7 @@ from PIL import Image
 
 from . import models as m
 from .build import compile_font
+from .construction import NETWORK_KEY
 from .design import (
     analyze_font,
     applies_to_master,
@@ -31,6 +32,9 @@ from .domain import (
     set_info,
     validate_font,
 )
+from .inspection import select_inspection
+from .interpolation import inspect_interpolation
+from .planning import compact_coverage
 from .proof import proof_frame, proof_view
 from .references import import_png, reference_frame
 from .render import glyph_frame, glyph_view, save_render, text_view
@@ -55,6 +59,12 @@ CAPABILITIES = {
     "design_diagnostics": True,
     "default_outline_checks": True,
     "normal_stroke_profiles": True,
+    "regional_measurement_coverage": True,
+    "normal_variation_profiles": True,
+    "stroke_networks": True,
+    "calibrated_reference_crops": True,
+    "interpolation_diagnostics": True,
+    "usage_glyph_and_sequence_coverage": True,
     "revision_bound_reviews": True,
     "release_contract": True,
     "linked_accent_composition": True,
@@ -77,9 +87,9 @@ TOOLS = {
         "Reopen a server-created project by ID; verifies committed sources and returns its revision.",
     ),
     "project_inspect": (
-        m.Page,
+        m.Inspect,
         True,
-        "Inspect revision metrics and glyph count. Use detail=full for metadata, kerning and paginated glyph inventory.",
+        "Inspect a master with optional sections and glyph_ids focus. Full collections are paginated; pagination lists each continuation. Use sections=['design'] for the complete design contract without spacing/compositions.",
     ),
     "project_update": (
         m.ProjectUpdate,
@@ -136,9 +146,9 @@ TOOLS = {
         False,
         "Check visible ink, matching outlines and self crossings by default; measure declared design rules, "
         "normal stroke/counter profiles, smooth joins, digit spacing and required coverage. "
-        "Rules accept master_id or a variable location; variation_probes measure stroke progression. "
-        "Compiles only when location/variation checks are requested. Unmarked curve joins are review candidates. "
-        "Returns localized issues and explicit scope, not artistic approval. detail=full includes measurements.",
+        "Rules accept master_id or a variable location; variation_profiles measure normal-width progression. "
+        "interpolation=true adds timed source correspondence and compiled axis-grid checks. "
+        "Returns regional coverage and localized candidates, not artistic approval. Full reports include measurements and evidence_plan.",
     ),
     "proof_review": (
         m.ProofReview,
@@ -273,11 +283,48 @@ class Service:
                         "Maximum 64 drawing references",
                     )
                     image, original_hash = import_png(self.store, request.source_path)
+                    source_page_uri = None
+                    calibration = request.image_to_font
+                    if request.crop:
+                        x0, y0, x1, y1 = request.crop
+                        require(
+                            0 <= x0 < x1 <= image.width and 0 <= y0 < y1 <= image.height,
+                            "invalid_reference",
+                            "Crop must be inside the source page",
+                        )
+                        previous = next(
+                            (
+                                r
+                                for r in state.references
+                                if r.source_sha256 == original_hash and r.source_page_uri
+                            ),
+                            None,
+                        )
+                        if previous:
+                            source_page_uri = previous.source_page_uri
+                            self.store.read_resource(source_page_uri)
+                        else:
+                            page, _ = save_render(
+                                self.store,
+                                project_id,
+                                revision,
+                                image,
+                                {"kind": "reference_page"},
+                                {"source_sha256": original_hash, "engine": "Preserved reference page"},
+                            )
+                            source_page_uri = self.store.resource_uri(
+                                project_id, revision, page["artifact_id"], "image.png"
+                            )
+                        image = image.crop(request.crop)
+                        a, b, c, d, tx, ty = calibration
+                        calibration = (a, b, c, d, tx + a * x0 + c * y0, ty + b * x0 + d * y0)
                     reference = m.DrawingReference(
                         id=request.reference_id,
                         glyph_id=request.glyph_id,
                         label=request.label,
-                        image_to_font=request.image_to_font,
+                        image_to_font=calibration,
+                        source_crop=request.crop,
+                        source_page_uri=source_page_uri,
                         width=image.width,
                         height=image.height,
                         source_sha256=original_hash,
@@ -364,6 +411,8 @@ class Service:
                     affected = refresh_compositions(master_font, state.composition_links.get(key, {}))
                     result.changed = list(dict.fromkeys([*result.changed, *affected]))
                 state.composition_links = {k: v for k, v in state.composition_links.items() if v}
+                if any(NETWORK_KEY in g.lib for f in fonts.values() for g in f):
+                    state.version = 3
                 if persist_design or state != m.DesignState():
                     extra["design"] = state.model_dump()
                 new = self.store.commit(
@@ -422,13 +471,18 @@ class Service:
                         "rule_count": len(state.spec.metric_rules)
                         + len(state.spec.stroke_probes)
                         + len(state.spec.stroke_profiles)
-                        + len(state.spec.variation_probes),
+                        + len(state.spec.variation_probes)
+                        + len(state.spec.variation_profiles)
+                        + len(state.spec.regions),
                         "latest_decision": manifest["decisions"][-1:] or [],
                         "full_context": "project_inspect(detail=full)",
                     }
+                else:
+                    result.data = select_inspection(result.data, request, font)
             elif name == "glyph_get":
                 require(request.glyph_id in font, "missing_reference", f"Missing glyph {request.glyph_id}")
                 result.data = {
+                    "construction": font[request.glyph_id].lib.get(NETWORK_KEY),
                     "glyph_id": request.glyph_id,
                     **(
                         glyph_data(font[request.glyph_id]).model_dump()
@@ -442,8 +496,8 @@ class Service:
                 locks.close()
                 report = analyze_font(font, state.spec, master_id)
                 report["master_id"] = master_id
-                if needs_variation(state.spec):
-                    _, binary_bytes = compile_font(
+                if needs_variation(state.spec) or (request.interpolation and manifest.get("variation")):
+                    compiled, binary_bytes = compile_font(
                         self.store,
                         project_id,
                         fonts["default"],
@@ -451,7 +505,18 @@ class Service:
                         source,
                         ["ttf"],
                     )
-                    attach_variation(report, analyze_variation(binary_bytes, state.spec))
+                    if needs_variation(state.spec):
+                        attach_variation(report, analyze_variation(binary_bytes, state.spec))
+                    if request.interpolation and manifest.get("variation"):
+                        interpolation = inspect_interpolation(
+                            self.store,
+                            project_id,
+                            manifest,
+                            self.store.root / compiled["files"]["ttf"]["path"],
+                            hashlib.sha256(binary_bytes).hexdigest(),
+                        )
+                        report["interpolation"] = interpolation
+                        report["checks_passed"] &= interpolation["checks_passed"]
                 self.store.verify(project_id, revision)
                 uri = self.store.save_report(project_id, revision, report)
                 if request.detail == "summary":
@@ -480,6 +545,15 @@ class Service:
                     )
                 else:
                     result.data = report
+                if "interpolation" in report:
+                    result.data["interpolation"] = {
+                        k: report["interpolation"][k] for k in ("status", "checks_passed", "report_uri")
+                    }
+                if request.detail == "summary":
+                    result.data["design_coverage"] = compact_coverage(report["design_coverage"])
+                    result.data["review_groups"] = [
+                        {"kind": r["kind"], "count": r["count"]} for r in report["review_groups"]
+                    ]
                 result.data["report_uri"] = uri
                 result.summary = (
                     "Declared checks passed; visual quality not assessed"
@@ -518,12 +592,25 @@ class Service:
                         report["scope"]["design_contract"] = "unavailable"
                 variation_report = None
                 binary_hash = None
-                needs_compilation = name == "font_release_check" or request.purpose == "release"
+                needs_compilation = (
+                    name == "font_release_check"
+                    or request.purpose == "release"
+                    or request.require_design_checks
+                )
                 if needs_compilation or (not scope_error and needs_variation(state.spec)):
-                    _, binary_bytes = compile_font(
+                    compiled, binary_bytes = compile_font(
                         self.store, project_id, checked["default"], manifest, source, ["ttf"]
                     )
                     binary_hash = hashlib.sha256(binary_bytes).hexdigest()
+                interpolation = None
+                if needs_compilation and manifest.get("variation"):
+                    interpolation = inspect_interpolation(
+                        self.store,
+                        project_id,
+                        manifest,
+                        self.store.root / compiled["files"]["ttf"]["path"],
+                        binary_hash,
+                    )
                 if not scope_error and needs_variation(state.spec):
                     variation_report = analyze_variation(binary_bytes, state.spec)
                     for report in reports.values():
@@ -551,6 +638,16 @@ class Service:
                         binary_hash,
                     )
                     readiness["analysis_reports"] = evidence
+                    if interpolation is not None:
+                        readiness["interpolation"] = interpolation
+                        if not interpolation["checks_passed"]:
+                            readiness["ready"] = False
+                            readiness["reasons"].append(
+                                {
+                                    "kind": "interpolation_checks_failed",
+                                    "report_uri": interpolation["report_uri"],
+                                }
+                            )
                     readiness["report_uri"] = self.store.save_report(project_id, revision, readiness)
                 if name == "font_release_check":
                     result.data = readiness
@@ -560,6 +657,12 @@ class Service:
                 else:
                     gated = request.require_design_checks or request.purpose == "release"
                     if gated:
+                        if interpolation is not None:
+                            require(
+                                interpolation["checks_passed"],
+                                "interpolation_checks_failed",
+                                f"Interpolation checks failed; read {interpolation['report_uri']}",
+                            )
                         require(
                             bool(state.spec.required_characters),
                             "design_contract_missing",

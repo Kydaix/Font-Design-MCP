@@ -156,6 +156,69 @@ def analyze_variation(binary_bytes, spec):
                     "minimum_change": probe.minimum_change,
                 }
             )
+        for profile in spec.variation_profiles:
+            samples = [
+                evaluate(profile, {**profile.location, profile.axis_tag: value}) for value in profile.values
+            ]
+            sign = 1 if profile.direction == "nondecreasing" else -1
+            for row in samples:
+                if not row.get("checks_passed", False):
+                    issues.append(
+                        {
+                            **row,
+                            "kind": "variation_profile_unmeasurable",
+                            "message": "Normal profile is missing ink or exceeds its bounds at this location",
+                        }
+                    )
+            for index in range(profile.samples):
+                values = [row.get("samples", [{}] * profile.samples)[index].get("actual") for row in samples]
+                previous = None
+                for value, actual in zip(profile.values, values):
+                    if actual is None:
+                        continue
+                    if previous is not None and sign * (actual - previous) < -profile.tolerance:
+                        issues.append(
+                            {
+                                "kind": "variation_direction_mismatch",
+                                "glyph": profile.glyph_id,
+                                "rule_id": profile.id,
+                                "sample_index": index,
+                                "axis_value": value,
+                                "actual": actual,
+                                "previous_extremum": previous,
+                                "message": "Local normal width reverses the declared progression",
+                            }
+                        )
+                    previous = (
+                        actual
+                        if previous is None
+                        else max(previous, actual)
+                        if sign == 1
+                        else min(previous, actual)
+                    )
+                if (
+                    values[0] is not None
+                    and values[-1] is not None
+                    and sign * (values[-1] - values[0]) + profile.tolerance < profile.minimum_change
+                ):
+                    issues.append(
+                        {
+                            "kind": "variation_change_insufficient",
+                            "glyph": profile.glyph_id,
+                            "rule_id": profile.id,
+                            "sample_index": index,
+                            "message": "Local normal width does not meet endpoint progression",
+                        }
+                    )
+            measurements.append(
+                {
+                    "kind": "variation_profile",
+                    "glyph": profile.glyph_id,
+                    "rule_id": profile.id,
+                    "axis_tag": profile.axis_tag,
+                    "samples": samples,
+                }
+            )
     return {
         "status": "checked",
         "checks_passed": not issues,

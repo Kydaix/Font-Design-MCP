@@ -18,7 +18,7 @@ from pydantic import TypeAdapter
 from ufoLib2 import Font
 
 from .domain import FontError, require, validate_font
-from .models import DesignState, Revision, Variation
+from .models import DesignState, Revision, StrokeNetwork, Variation
 from .telemetry import count, phase
 
 REVISION = TypeAdapter(Revision)
@@ -128,11 +128,23 @@ def validate_ufo_file(ufo, p, data):
     if p.name == "features.fea":
         require(not data.strip(), "capability_unavailable", "Raw feature code unsupported")
     if p.suffix == ".glif":
+        from .construction import NETWORK_KEY
+
         require(
-            tree.find("image") is None and tree.find("lib") is None,
+            tree.find("image") is None,
             "capability_unavailable",
-            "Glyph images and lib entries unsupported",
+            "Glyph images unsupported",
         )
+        for lib in tree.findall("lib"):
+            require(len(lib) == 1 and lib[0].tag == "dict", "capability_unavailable", "Invalid glyph lib")
+            values = plistlib.loads(b"<plist>" + ElementTree.tostring(lib[0]) + b"</plist>")
+            require(
+                set(values) <= {NETWORK_KEY},
+                "capability_unavailable",
+                "Arbitrary glyph lib entries unsupported",
+            )
+            if NETWORK_KEY in values:
+                StrokeNetwork.model_validate(values[NETWORK_KEY])
     if p.name == "lib.plist":
         require(not plistlib.loads(data), "capability_unavailable", "UFO lib hooks unsupported")
     if p.name == "layercontents.plist":
@@ -254,14 +266,14 @@ class Store:
         require(
             manifest.get("revision") == revision
             and manifest.get("project_id") == project_id
-            and manifest.get("schema") in (1, 2, 3, 4),
+            and manifest.get("schema") in (1, 2, 3, 4, 5),
             "external_modification",
             "Invalid revision manifest",
         )
         if "design" in manifest:
             state = DesignState.model_validate(manifest["design"])
             require(
-                manifest["schema"] == (4 if state.version == 2 else 3),
+                manifest["schema"] == state.version + 2,
                 "external_modification",
                 "Design state/manifest schema mismatch",
             )
@@ -332,6 +344,8 @@ class Store:
         if "design" in manifest:
             for reference in DesignState.model_validate(manifest["design"]).references:
                 self.read_resource(reference.uri)
+                if reference.source_page_uri:
+                    self.read_resource(reference.source_page_uri)
         return manifest, ufo
 
     @phase("load")
@@ -367,6 +381,8 @@ class Store:
                 "missing_reference",
                 "Linked compositions reference an unknown master",
             )
+            reference_bytes = sum(r.encoded_bytes for r in state.references)
+            pages = set()
             for reference in state.references:
                 require(
                     reference.uri.startswith(f"font-design://{project_id}/"),
@@ -374,6 +390,21 @@ class Store:
                     "Drawing references must belong to this project",
                 )
                 self.read_resource(reference.uri)
+                if reference.source_page_uri:
+                    require(
+                        reference.source_page_uri.startswith(f"font-design://{project_id}/"),
+                        "path_denied",
+                        "Reference page must belong to this project",
+                    )
+                    data, _ = self.read_resource(reference.source_page_uri)
+                    if reference.source_page_uri not in pages:
+                        reference_bytes += len(data)
+                        pages.add(reference.source_page_uri)
+            require(
+                reference_bytes <= 32_000_000,
+                "limit_exceeded",
+                "References including preserved pages exceed 32 MB",
+            )
         if expected is not None:
             require(
                 self.head(project_id)["revision"] == expected, "stale_revision", "Expected revision is stale"
@@ -414,7 +445,7 @@ class Store:
         fsync_directory(ufo / "glyphs")
         fsync_directory(ufo)
         manifest = {
-            "schema": (4 if extra["design"]["version"] == 2 else 3)
+            "schema": extra["design"]["version"] + 2
             if "design" in extra
             else 2
             if "variation" in extra

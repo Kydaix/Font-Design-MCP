@@ -72,7 +72,7 @@ def reference_frame(reference):
     )
 
 
-def reference_layer(image, reference, width, height, scale, tx, ty):
+def warped_reference(image, reference, width, height, scale, tx, ty):
     # Pixel origin is top-left/down; font origin is baseline/up. Do not auto-fit or flip sketches implicitly.
     font_to_pixel = Transform(scale, 0, 0, -scale, tx, height - ty)
     pixel_to_image = font_to_pixel.transform(Transform(*reference.image_to_font)).inverse()
@@ -84,4 +84,9 @@ def reference_layer(image, reference, width, height, scale, tx, ty):
         resample=Image.Resampling.BILINEAR,
         fillcolor="white",
     )
-    return Image.blend(Image.new("RGB", warped.size, "white"), warped.convert("RGB"), 0.45)
+    return warped.convert("RGB")
+
+
+def reference_layer(image, reference, width, height, scale, tx, ty):
+    warped = warped_reference(image, reference, width, height, scale, tx, ty)
+    return Image.blend(Image.new("RGB", warped.size, "white"), warped, 0.45)

@@ -21,13 +21,19 @@ INSTRUCTIONS = """Create and edit Unicode UFO projects using explicit project ID
 Coordinates are font units, baseline y=0, Y upwards; advance differs from visible width.
 Read stable IDs with glyph_get(detail=full) before moving points. Prefer font_edit for several glyphs;
 use stroke_path/filled_path/primitive for drawings and point operations for optical corrections.
+For reusable centerlines use stroke_network with named width parameters; update_stroke_network widens centerlines
+before stroking so normal thickness can remain stable. Detach the network before independent contour edits.
 For variable fonts, draw the default master, call variable_configure to define axes and clone masters,
 then edit each master via master_id. Keep contour/point order, components and glyph sets compatible.
 font_build exports a variable TTF/WOFF2 automatically; render_text(location={"wght": 550}) previews axes.
 Responses default to summaries; request full details or read returned immutable report URIs when needed.
+Use project_inspect(detail=full, sections=[...], glyph_ids=[...]) to focus context; each large collection is paginated.
 Define brief/coverage, explore structural glyphs, compare proportions and optical corrections,
 set side bearings before kerning, test words before expanding coverage. Log decisions with project_update.
 For hand-drawn work, import PNGs from workspace/inbox with reference_import and explicit image_to_font calibration.
+Use crop=[left,top,right,bottom] with calibration of the original page: the page and crop are preserved together.
+Record glyph_origins as observed, extrapolated or original; observed shapes must name their imported reference IDs.
+Use render_glyph(comparison_mode=difference) for calibrated reference differences; overlap is not an artistic score.
 Do not claim automatic tracing: inspect the reference, preserve distinctive features, reconstruct outlines, then
 compare with render_glyph(reference_id=...). Define required_characters, digit_spacing, metric_rules and stroke_probes
 in project_update(design_spec=...). Keep reference glyphs small until curves and proportions are reviewed.
@@ -37,10 +43,15 @@ After each structural change run font_analyze, render_proof at common scale (inc
 usage sizes with and without kerning. Correct shared causes, not entire glyphs blindly. Inspect the actual images.
 Metric/stroke rules accept master_id or location (mutually exclusive); unscoped rules apply to every master.
 Declare variation_probes for stroke progression with axis_tag, ordered values, direction and optional minimum_change.
+Use variation_profiles for normal-width progression of diagonals at multiple samples, across weights and widths.
+Call font_analyze(interpolation=true) to inspect source correspondence and a compiled axis grid before delivery.
 font_analyze compiles location/variation checks and reports unmarked curve joins as review candidates, not errors.
 Default analysis checks visible ink, matching outlines and self crossings; review candidates carry stable finding IDs.
 Use stroke_profiles with start/end centerlines, minimum/maximum normal widths and max_ratio for diagonals and counters.
 render_glyph(measurements=true) overlays profile samples; inspect them before changing rules or outlines.
+Read evidence_plan in the full analysis report: it proposes unmeasured regions, proof groups and supported words.
+Latin anatomy templates require distinct spatial samples per branch/junction; add design_spec.regions for other forms.
+Declare usage_texts from the brief, including real words and problematic pairs. Never loosen targets just to pass.
 Include K/M/N/V/W/Y/R/k/m/y and digits in structural exploration; uniform stroke_path outlines help preserve branch widths.
 Do not expand accents until structural glyphs and shaped words are convincing. Probe each structural reference glyph.
 font_build defaults to purpose=proof. require_design_checks=true gates default and declared checks, not visual review.
@@ -48,6 +59,8 @@ After viewing actual renders, record proof_review with exact revision and render
 Resolve intentional candidates with finding_id and a specific reason; repair unintended defects and render again.
 font_release_check reports missing evidence. For purpose=release, supply review_uris from proof_review:
 every visible glyph/master, structural measurements, reference overlays and text at <=32 and >=48 px with kern true/false.
+Text evidence must contain adjacent visible shaped glyphs; blank or isolated-letter proofs cannot cover word usage.
+Every structural glyph and required usage_text must be seen in these settings; a stem probe cannot cover a whole K.
 Variable releases also need intermediate-axis text reviews. Every edit invalidates prior revision evidence.
 Never call a proof export a reviewed release; successful release checks are still not human or artistic approval.
 Technical validation is not artistic or human approval. Images are provided as MCP image content;

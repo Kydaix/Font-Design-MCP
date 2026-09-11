@@ -578,7 +578,7 @@ def test_text_review_is_bound_to_the_compiler_binary_not_only_the_revision(tmp_p
             revision,
             source.convert("RGB"),
             old["parameters"],
-            {"build": old["build"], "warnings": []},
+            {"build": old["build"], "warnings": [], "usage": old["usage"]},
         )
     evidence[1] = service.store.resource_uri(pid, revision, stored["artifact_id"], "artifact.json")
     uri = review(service, pid, revision, evidence)
